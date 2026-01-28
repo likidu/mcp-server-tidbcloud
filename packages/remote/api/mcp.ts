@@ -60,7 +60,7 @@ const handler = createMcpHandler(
     },
   },
   {
-    basePath: "/api/mcp",
+    basePath: "/mcp",
   },
 );
 
