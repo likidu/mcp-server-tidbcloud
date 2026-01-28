@@ -2,7 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "cd ../.. && pnpm build",
   "installCommand": "cd ../.. && pnpm install",
-  "framework": null,
   "rewrites": [
     {
       "source": "/(.*)",
