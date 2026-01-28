@@ -1,8 +1,7 @@
 /**
  * TiDB Cloud MCP Server - Remote/Hosted Version
  *
- * A Hono-based MCP server supporting Streamable HTTP transport
- * and OAuth 2.1 authentication for TiDB Cloud.
+ * A Hono-based MCP server supporting Streamable HTTP transport.
  */
 
 import { Hono } from "hono";
@@ -10,11 +9,6 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { loadConfig, validateConfig } from "./config.js";
 import { createMcpHandler } from "./mcp/handler.js";
-import { createProtectedResourceMetadataHandler } from "./oauth/metadata.js";
-import {
-  createAuthorizeHandler,
-  createCallbackHandler,
-} from "./oauth/callback.js";
 import { getLandingPageHtml } from "./landing.js";
 import { rateLimiter } from "./middleware/rateLimit.js";
 import {
@@ -89,23 +83,6 @@ app.get("/health", (c) => {
   });
 });
 
-// OAuth Protected Resource Metadata (RFC 9728)
-// This tells MCP clients how to authenticate
-app.get(
-  "/.well-known/oauth-protected-resource",
-  createProtectedResourceMetadataHandler(config),
-);
-
-// Also support the path-based metadata endpoint
-app.get(
-  "/.well-known/oauth-protected-resource/mcp",
-  createProtectedResourceMetadataHandler(config),
-);
-
-// OAuth endpoints
-app.get("/oauth/authorize", createAuthorizeHandler(config));
-app.get("/oauth/callback", createCallbackHandler(config));
-
 // MCP endpoint (Streamable HTTP transport)
 const mcpHandler = createMcpHandler(config);
 app.all("/mcp", mcpHandler);
@@ -129,15 +106,10 @@ app.get("/api", (c) => {
   return c.json({
     name: "TiDB Cloud MCP Server",
     version: "0.1.0",
-    description: "MCP server for TiDB Cloud with OAuth 2.1 support",
+    description: "MCP server for TiDB Cloud",
     endpoints: {
       mcp: `${baseUrl}/mcp`,
       health: `${baseUrl}/health`,
-      oauth: {
-        authorize: `${baseUrl}/oauth/authorize`,
-        callback: `${baseUrl}/oauth/callback`,
-      },
-      metadata: `${baseUrl}/.well-known/oauth-protected-resource`,
     },
     documentation: "https://github.com/likidu/mcp-server-tidbcloud",
   });
