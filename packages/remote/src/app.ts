@@ -15,7 +15,6 @@ import {
   createAuthorizeHandler,
   createCallbackHandler,
 } from "./oauth/callback.js";
-import { createAuthMiddleware } from "./oauth/middleware.js";
 import { getLandingPageHtml } from "./landing.js";
 import { rateLimiter } from "./middleware/rateLimit.js";
 import {
@@ -108,14 +107,7 @@ app.get("/oauth/authorize", createAuthorizeHandler(config));
 app.get("/oauth/callback", createCallbackHandler(config));
 
 // MCP endpoint (Streamable HTTP transport)
-// For Phase 1 (local development), we skip auth to test with API keys
 const mcpHandler = createMcpHandler(config);
-
-// In production with OAuth, we'd use:
-// app.all("/mcp", createAuthMiddleware(config), mcpHandler);
-
-// For now, allow unauthenticated access for testing
-// Use app.all to handle GET, POST, DELETE in one route
 app.all("/mcp", mcpHandler);
 
 // Root endpoint - Landing page
