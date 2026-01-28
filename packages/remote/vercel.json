@@ -1,22 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "bash vercel-build.sh",
-  "builds": [
+  "buildCommand": "cd ../.. && pnpm install && pnpm build",
+  "framework": null,
+  "rewrites": [
     {
-      "src": "api/index.ts",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/api/index.ts",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Mcp-Session-Id, Origin",
-        "Access-Control-Expose-Headers": "Mcp-Session-Id"
-      }
+      "source": "/(.*)",
+      "destination": "/api"
     }
   ]
 }
