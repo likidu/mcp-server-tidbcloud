@@ -21,13 +21,14 @@ if (!publicKey || !privateKey) {
 }
 
 // Create API client
-const client = publicKey && privateKey
-  ? new TiDBCloudClient({
-      publicKey,
-      privateKey,
-      apiBaseUrl: "https://serverless.tidbapi.com",
-    })
-  : null;
+const client =
+  publicKey && privateKey
+    ? new TiDBCloudClient({
+        publicKey,
+        privateKey,
+        apiBaseUrl: "https://serverless.tidbapi.com",
+      })
+    : null;
 
 // Database config (optional)
 const databaseConfig = process.env.TIDB_CLOUD_DB_HOST
@@ -53,8 +54,10 @@ const handler = createMcpHandler(
     registerDatabaseTools(server, databaseConfig);
   },
   {
-    name: "tidbcloud-mcp-server",
-    version: "0.1.0",
+    serverInfo: {
+      name: "tidbcloud-mcp-server",
+      version: "0.1.0",
+    },
   },
   {
     basePath: "/api/mcp",
