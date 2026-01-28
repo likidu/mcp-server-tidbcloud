@@ -1,10 +1,12 @@
 /**
  * Vercel Serverless Function Entry Point
  *
- * Vercel's zero-config approach for Hono expects the app to be exported directly.
- * See: https://vercel.com/docs/frameworks/backend/hono
+ * Use @hono/node-server/vercel adapter for Node.js runtime compatibility.
+ * The standard hono/vercel adapter expects Web Fetch API Request objects,
+ * but Vercel's Node.js runtime passes Node.js IncomingMessage objects.
  */
 
+import { handle } from "@hono/node-server/vercel";
 import app from "../dist/app.js";
 
-export default app;
+export default handle(app);
