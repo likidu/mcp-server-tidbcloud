@@ -1,0 +1,19 @@
+{
+    "name": "mcp-server-tidbcloud",
+    "version": "0.1.0",
+    "private": true,
+    "description": "MCP server for TiDB Cloud API integration",
+    "scripts": {
+        "build": "pnpm -r build",
+        "clean": "pnpm -r clean",
+        "dev": "pnpm --filter @likidu/mcp-server-tidbcloud dev",
+        "inspector": "dotenv -e .env -- npx @modelcontextprotocol/inspector node packages/server/dist/index.js"
+    },
+    "devDependencies": {
+        "dotenv-cli": "^11.0.0",
+        "typescript": "^5.7.2"
+    },
+    "engines": {
+        "node": ">=18"
+    }
+}
