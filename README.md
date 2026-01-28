@@ -6,8 +6,11 @@ An MCP (Model Context Protocol) server that enables LLMs to interact with TiDB C
 
 - **Cluster Management**: Create, list, update, and delete TiDB Cloud Serverless clusters
 - **Branch Management**: Create, list, get, and delete branches for clusters
+- **Database Operations**: Execute SQL queries and manage database schemas
 - **Async Operation Support**: Proper handling of long-running operations with status checking
-- **stdio Transport**: Works with Claude Desktop and other MCP clients
+- **Two Transport Options**:
+  - **stdio**: Local server for Claude Desktop (API keys in config)
+  - **HTTP**: Remote server for hosted deployments (Vercel, etc.)
 
 ## Prerequisites
 
@@ -29,25 +32,13 @@ pnpm install
 pnpm build
 ```
 
-## Configuration
-
-### Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `TIDB_CLOUD_PUBLIC_KEY` | Yes | TiDB Cloud API public key |
-| `TIDB_CLOUD_PRIVATE_KEY` | Yes | TiDB Cloud API private key |
-| `TIDB_CLOUD_API_URL` | No | API base URL (defaults to `https://serverless.tidbapi.com`) |
-
-### Getting Your API Keys
-
-1. Log in to [TiDB Cloud Console](https://tidbcloud.com)
-2. Click on your organization name in the left sidebar
-3. Navigate to **Organization Settings** → **API Keys**
-4. Click **Create API Key**
-5. Copy both the **Public Key** and **Private Key** (save the private key securely - it won't be shown again)
-
 ## Usage with Claude Desktop
+
+There are two ways to use this MCP server with Claude Desktop:
+
+### Option 1: Local Server (stdio)
+
+Run the server locally with API keys configured in Claude Desktop. Best for personal development with full control.
 
 Add the following to your Claude Desktop configuration file (`claude_desktop_config.json`):
 
@@ -66,6 +57,51 @@ Add the following to your Claude Desktop configuration file (`claude_desktop_con
 }
 ```
 
+**Environment Variables (Local Server):**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TIDB_CLOUD_PUBLIC_KEY` | Yes | TiDB Cloud API public key |
+| `TIDB_CLOUD_PRIVATE_KEY` | Yes | TiDB Cloud API private key |
+| `TIDB_CLOUD_API_URL` | No | API base URL (defaults to `https://serverless.tidbapi.com`) |
+
+### Option 2: Remote Server (HTTP)
+
+Connect to a hosted MCP server deployed on Vercel or similar platforms. Best for team sharing or when you don't want to manage API keys locally.
+
+Add the following to your Claude Desktop configuration file:
+
+```json
+{
+  "mcpServers": {
+    "tidbcloud": {
+      "url": "https://your-deployed-server.vercel.app/mcp"
+    }
+  }
+}
+```
+
+**Note:** No API keys needed in Claude Desktop config - they are configured on the server side (Vercel environment variables).
+
+**Environment Variables (Remote Server - Vercel):**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TIDB_CLOUD_PUBLIC_KEY` | Yes* | TiDB Cloud API public key |
+| `TIDB_CLOUD_PRIVATE_KEY` | Yes* | TiDB Cloud API private key |
+| `TIDB_OAUTH_CLIENT_ID` | Yes* | OAuth client ID (for OAuth mode) |
+| `TIDB_OAUTH_CLIENT_SECRET` | Yes* | OAuth client secret (for OAuth mode) |
+
+*Either API keys OR OAuth credentials are required, not both.
+
+### Getting Your API Keys
+
+1. Log in to [TiDB Cloud Console](https://tidbcloud.com)
+2. Click on your organization name in the left sidebar
+3. Navigate to **Organization Settings** → **API Keys**
+4. Click **Create API Key**
+5. Copy both the **Public Key** and **Private Key** (save the private key securely - it won't be shown again)
+
 ## Available Tools
 
 ### Cluster Management
@@ -83,7 +119,7 @@ Lists all TiDB Cloud Serverless clusters in your organization.
 Gets detailed information about a specific cluster.
 
 **Parameters:**
-- `clusterId` (required): The ID of the cluster
+- `cluster` (required): The cluster name or ID
 
 #### `tidbcloud_create_cluster`
 
@@ -101,7 +137,7 @@ Creates a new TiDB Cloud Serverless cluster. This is an async operation - the cl
 Updates an existing cluster's configuration.
 
 **Parameters:**
-- `clusterId` (required): The ID of the cluster to update
+- `cluster` (required): The cluster name or ID to update
 - `displayName` (optional): New display name
 - `spendingLimitMonthly` (optional): Monthly spending limit in USD
 - `labels` (optional): Key-value labels
@@ -111,7 +147,7 @@ Updates an existing cluster's configuration.
 Deletes a cluster. **Warning: This is irreversible!**
 
 **Parameters:**
-- `clusterId` (required): The ID of the cluster to delete
+- `cluster` (required): The cluster name or ID to delete
 
 ### Branch Management
 
@@ -120,7 +156,7 @@ Deletes a cluster. **Warning: This is irreversible!**
 Lists all branches for a cluster.
 
 **Parameters:**
-- `clusterId` (required): The ID of the cluster
+- `cluster` (required): The cluster name or ID
 - `pageSize` (optional): Number of branches per page (1-100)
 - `pageToken` (optional): Token for pagination
 
@@ -129,15 +165,15 @@ Lists all branches for a cluster.
 Gets detailed information about a specific branch. Useful for checking if a branch has finished creating.
 
 **Parameters:**
-- `clusterId` (required): The ID of the cluster
-- `branchId` (required): The ID of the branch
+- `cluster` (required): The cluster name or ID
+- `branch` (required): The branch name or ID
 
 #### `tidbcloud_create_branch`
 
 Creates a new branch for a TiDB Cloud Starter or Essential cluster. This is an async operation.
 
 **Parameters:**
-- `clusterId` (required): The ID of the TiDB Cloud cluster
+- `cluster` (required): The cluster name or ID
 - `displayName` (required): Display name for the new branch (max 64 characters)
 - `parentId` (optional): Parent branch ID (defaults to main cluster)
 - `parentTimestamp` (optional): RFC3339 timestamp for point-in-time branching
@@ -147,8 +183,8 @@ Creates a new branch for a TiDB Cloud Starter or Essential cluster. This is an a
 Deletes a branch. **Warning: This is irreversible!**
 
 **Parameters:**
-- `clusterId` (required): The ID of the cluster
-- `branchId` (required): The ID of the branch to delete
+- `cluster` (required): The cluster name or ID
+- `branch` (required): The branch name or ID to delete
 
 ## Async Operations
 
@@ -179,7 +215,7 @@ TIDB_CLOUD_PUBLIC_KEY='your-key' TIDB_CLOUD_PRIVATE_KEY='your-key' \
 ```
 mcp-server-tidbcloud/
 ├── packages/
-│   ├── server/                    # MCP Server package
+│   ├── server/                    # Core MCP Server (stdio transport)
 │   │   ├── src/
 │   │   │   ├── index.ts           # Entry point
 │   │   │   ├── server.ts          # MCP server setup
@@ -194,7 +230,15 @@ mcp-server-tidbcloud/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   └── client/                    # MCP Client (future)
+│   └── remote/                    # Remote MCP Server (HTTP transport)
+│       ├── src/
+│       │   ├── index.ts           # Entry point
+│       │   ├── app.ts             # Hono web app
+│       │   ├── config.ts          # Configuration with OAuth support
+│       │   ├── landing.ts         # Landing page
+│       │   └── middleware/        # Security middleware
+│       ├── package.json
+│       └── tsconfig.json
 │
 ├── package.json                   # Root workspace config
 ├── pnpm-workspace.yaml
