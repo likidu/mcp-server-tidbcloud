@@ -64,30 +64,6 @@ function createServer(): McpServer {
   return server;
 }
 
-// Convert Vercel request to Web Fetch Request
-function toWebRequest(req: VercelRequest): Request {
-  const protocol = req.headers["x-forwarded-proto"] || "https";
-  const host =
-    req.headers["x-forwarded-host"] || req.headers.host || "localhost";
-  const url = `${protocol}://${host}${req.url}`;
-
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (value) {
-      headers.set(key, Array.isArray(value) ? value.join(", ") : value);
-    }
-  }
-
-  // Read body for POST requests
-  const body = req.method === "POST" ? JSON.stringify(req.body) : undefined;
-
-  return new Request(url, {
-    method: req.method || "GET",
-    headers,
-    body,
-  });
-}
-
 // Handler for incoming requests
 export default async function handler(
   req: VercelRequest,
@@ -123,44 +99,26 @@ export default async function handler(
     // Connect server to transport
     await server.connect(transport);
 
-    // Convert to Web Request and handle
-    const webRequest = toWebRequest(req);
-    const response = await transport.handleRequest(webRequest);
-
-    // Send response
-    res.status(response.status);
-
-    // Copy headers
-    response.headers.forEach((value, key) => {
-      res.setHeader(key, value);
-    });
-
-    // Send body
-    if (response.body) {
-      const reader = response.body.getReader();
-      const chunks: Uint8Array[] = [];
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-
-      const body = Buffer.concat(chunks);
-      res.send(body);
-    } else {
-      res.end();
-    }
+    // handleRequest writes directly to res
+    // Cast req/res to Node.js types since Vercel extends them
+    await transport.handleRequest(
+      req as unknown as import("http").IncomingMessage,
+      res as unknown as import("http").ServerResponse,
+      req.body, // Pass pre-parsed body
+    );
   } catch (error) {
     console.error("MCP request error:", error);
-    res.status(500).json({
-      jsonrpc: "2.0",
-      error: {
-        code: -32603,
-        message:
-          error instanceof Error ? error.message : "Internal server error",
-      },
-      id: null,
-    });
+    // Only send error if headers not already sent
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: "2.0",
+        error: {
+          code: -32603,
+          message:
+            error instanceof Error ? error.message : "Internal server error",
+        },
+        id: null,
+      });
+    }
   }
 }
