@@ -1,16 +1,15 @@
 /**
  * TiDB Cloud MCP Server - Remote/Hosted Version
  *
- * A Hono-based MCP server supporting Streamable HTTP transport.
+ * Hono app for non-MCP endpoints (landing page, health check, etc.)
+ * MCP endpoint is handled separately by api/mcp/route.ts using mcp-handler
  */
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { loadConfig, validateConfig } from "./config.js";
-import { createMcpHandler } from "./mcp/handler.js";
 import { getLandingPageHtml } from "./landing.js";
-import { rateLimiter } from "./middleware/rateLimit.js";
 import {
   httpsEnforcement,
   securityHeaders,
@@ -44,32 +43,13 @@ app.use("*", securityHeaders());
 // Request logging
 app.use("*", logger());
 
-// Rate limiting for MCP endpoint (100 requests per minute per IP)
-app.use(
-  "/mcp",
-  rateLimiter({
-    windowMs: 60 * 1000,
-    max: 100,
-    message: "Too many requests to MCP endpoint, please try again later",
-  }),
-);
-
-// CORS configuration for MCP clients
+// CORS configuration
 app.use(
   "*",
   cors({
-    origin: "*", // MCP clients may come from anywhere
+    origin: "*",
     allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
-    allowHeaders: [
-      "Authorization",
-      "Content-Type",
-      "Accept",
-      "mcp-session-id",
-      "mcp-protocol-version",
-      "Last-Event-ID",
-      "Origin",
-    ],
-    exposeHeaders: ["mcp-session-id", "mcp-protocol-version"],
+    allowHeaders: ["Authorization", "Content-Type", "Accept", "Origin"],
     maxAge: 86400,
   }),
 );
@@ -82,10 +62,6 @@ app.get("/health", (c) => {
     version: "0.1.0",
   });
 });
-
-// MCP endpoint (Streamable HTTP transport)
-const mcpHandler = createMcpHandler(config);
-app.all("/mcp", mcpHandler);
 
 // Root endpoint - Landing page
 app.get("/", (c) => {

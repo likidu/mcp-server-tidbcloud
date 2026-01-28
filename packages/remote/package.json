@@ -12,10 +12,11 @@
     "vercel-install": "cd ../.. && pnpm install && pnpm build"
   },
   "dependencies": {
-    "hono": "^4.6.0",
     "@hono/node-server": "^1.13.0",
-    "@modelcontextprotocol/sdk": "^1.6.1",
     "@likidu/mcp-server-tidbcloud": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "hono": "^4.6.0",
+    "mcp-handler": "^1.0.7",
     "zod": "^3.23.8"
   },
   "devDependencies": {
