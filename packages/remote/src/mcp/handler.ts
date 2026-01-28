@@ -51,53 +51,67 @@ function createMcpServerWithTools(
   return server;
 }
 
+// Session storage for stateful connections
+const sessions = new Map<
+  string,
+  { server: McpServer; transport: WebStandardStreamableHTTPServerTransport }
+>();
+
 /**
  * Creates the MCP handler for Hono
  */
 export function createMcpHandler(config: Config) {
-  // For API key mode, create a single shared server and transport
-  let sharedServer: McpServer | null = null;
-  let sharedTransport: WebStandardStreamableHTTPServerTransport | null = null;
-
-  if (config.tidbCloud?.publicKey && config.tidbCloud?.privateKey) {
-    // Create MCP server with tools
-    sharedServer = createMcpServerWithTools(
-      config.tidbCloud.publicKey,
-      config.tidbCloud.privateKey,
-      config.database,
-    );
-
-    // Create stateless transport (no session management needed for API key mode)
-    sharedTransport = new WebStandardStreamableHTTPServerTransport({
-      // Stateless mode - no sessionIdGenerator
-      enableJsonResponse: true,
-    });
-
-    // Connect server to transport
-    sharedServer.connect(sharedTransport).catch((err) => {
-      console.error("Failed to connect MCP server to transport:", err);
-    });
-  }
-
   return async (c: Context) => {
-    // If we have a shared transport (API key mode), use it directly
-    if (sharedTransport) {
-      return sharedTransport.handleRequest(c.req.raw);
+    // Check if API keys are configured
+    if (!config.tidbCloud?.publicKey || !config.tidbCloud?.privateKey) {
+      return c.json(
+        {
+          jsonrpc: "2.0",
+          error: {
+            code: -32603,
+            message:
+              "Server not configured. Please set TIDB_CLOUD_PUBLIC_KEY and TIDB_CLOUD_PRIVATE_KEY.",
+          },
+          id: null,
+        },
+        500,
+      );
     }
 
-    // OAuth mode: need to handle per-session transports
-    // For now, return an error since OAuth isn't fully implemented
-    return c.json(
-      {
-        jsonrpc: "2.0",
-        error: {
-          code: -32603,
-          message:
-            "OAuth mode not yet implemented. Please configure TIDB_PUBLIC_KEY and TIDB_PRIVATE_KEY.",
-        },
-        id: null,
-      },
-      500,
-    );
+    // Get or create session based on mcp-session-id header
+    const sessionId = c.req.header("mcp-session-id");
+
+    let server: McpServer;
+    let transport: WebStandardStreamableHTTPServerTransport;
+
+    if (sessionId && sessions.has(sessionId)) {
+      // Reuse existing session
+      const session = sessions.get(sessionId)!;
+      server = session.server;
+      transport = session.transport;
+    } else {
+      // Create new server and transport for this session
+      server = createMcpServerWithTools(
+        config.tidbCloud.publicKey,
+        config.tidbCloud.privateKey,
+        config.database,
+      );
+
+      transport = new WebStandardStreamableHTTPServerTransport({
+        sessionIdGenerator: () => crypto.randomUUID(),
+        enableJsonResponse: true,
+      });
+
+      // Connect server to transport
+      await server.connect(transport);
+
+      // Store session if we have a session ID
+      if (sessionId) {
+        sessions.set(sessionId, { server, transport });
+      }
+    }
+
+    // Handle the request
+    return transport.handleRequest(c.req.raw);
   };
 }
