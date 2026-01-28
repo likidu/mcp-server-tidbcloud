@@ -14,7 +14,7 @@ An MCP (Model Context Protocol) server that enables LLMs to interact with TiDB C
 
 ## Prerequisites
 
-- Node.js 18 or later
+- Node.js 22 or later
 - pnpm package manager
 - TiDB Cloud account with API access
 
@@ -36,9 +36,25 @@ pnpm build
 
 There are two ways to use this MCP server with Claude Desktop:
 
-### Option 1: Local Server (stdio)
+### Option 1: Remote Server (Recommended)
 
-Run the server locally with API keys configured in Claude Desktop. Best for personal development with full control.
+Connect to the hosted MCP server. No local setup or API keys needed in Claude Desktop.
+
+Add the following to your Claude Desktop configuration file (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "tidbcloud": {
+      "url": "https://mcp-server-tidbcloud-remote.vercel.app/mcp"
+    }
+  }
+}
+```
+
+### Option 2: Local Server (stdio)
+
+Run the server locally with API keys configured in Claude Desktop. Best for development or when you need full control.
 
 Add the following to your Claude Desktop configuration file (`claude_desktop_config.json`):
 
@@ -64,35 +80,6 @@ Add the following to your Claude Desktop configuration file (`claude_desktop_con
 | `TIDB_CLOUD_PUBLIC_KEY` | Yes | TiDB Cloud API public key |
 | `TIDB_CLOUD_PRIVATE_KEY` | Yes | TiDB Cloud API private key |
 | `TIDB_CLOUD_API_URL` | No | API base URL (defaults to `https://serverless.tidbapi.com`) |
-
-### Option 2: Remote Server (HTTP)
-
-Connect to a hosted MCP server deployed on Vercel or similar platforms. Best for team sharing or when you don't want to manage API keys locally.
-
-Add the following to your Claude Desktop configuration file:
-
-```json
-{
-  "mcpServers": {
-    "tidbcloud": {
-      "url": "https://your-deployed-server.vercel.app/mcp"
-    }
-  }
-}
-```
-
-**Note:** No API keys needed in Claude Desktop config - they are configured on the server side (Vercel environment variables).
-
-**Environment Variables (Remote Server - Vercel):**
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `TIDB_CLOUD_PUBLIC_KEY` | Yes* | TiDB Cloud API public key |
-| `TIDB_CLOUD_PRIVATE_KEY` | Yes* | TiDB Cloud API private key |
-| `TIDB_OAUTH_CLIENT_ID` | Yes* | OAuth client ID (for OAuth mode) |
-| `TIDB_OAUTH_CLIENT_SECRET` | Yes* | OAuth client secret (for OAuth mode) |
-
-*Either API keys OR OAuth credentials are required, not both.
 
 ### Getting Your API Keys
 
