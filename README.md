@@ -38,7 +38,17 @@ There are two ways to use this MCP server with Claude Desktop:
 
 ### Option 1: Remote Server (Recommended)
 
-Connect to the hosted MCP server. No local setup or API keys needed in Claude Desktop.
+Connect to the hosted MCP server. No local setup or API keys needed.
+
+> **Note:** Remote MCP servers require Claude Pro, Max, Team, or Enterprise plan.
+
+**Via Claude Desktop UI (Recommended):**
+
+1. Open Claude Desktop
+2. Go to **Settings** → **Connectors** → **Add custom connector**
+3. Enter the server URL: `https://mcp-server-tidbcloud-remote.vercel.app/mcp`
+
+**Via config file (using mcp-remote bridge):**
 
 Add the following to your Claude Desktop configuration file (`claude_desktop_config.json`):
 
@@ -46,7 +56,8 @@ Add the following to your Claude Desktop configuration file (`claude_desktop_con
 {
   "mcpServers": {
     "tidbcloud": {
-      "url": "https://mcp-server-tidbcloud-remote.vercel.app/mcp"
+      "command": "npx",
+      "args": ["mcp-remote", "https://mcp-server-tidbcloud-remote.vercel.app/mcp"]
     }
   }
 }
