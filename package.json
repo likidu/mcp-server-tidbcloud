@@ -10,6 +10,9 @@
     "dev:remote": "pnpm --filter @likidu/mcp-server-tidbcloud-remote dev",
     "inspector": "dotenv -e .env -- npx @modelcontextprotocol/inspector node packages/server/dist/index.js"
   },
+  "dependencies": {
+    "mcp-handler": "^1.0.7"
+  },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",
     "typescript": "^5.7.2"
