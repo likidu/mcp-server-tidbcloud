@@ -17,49 +17,45 @@ console.log(`Server Host: ${config.server.serverHost}`);
 console.log("");
 
 if (config.tidbCloud?.publicKey) {
-    console.log("API Key authentication: Configured");
+  console.log("API Key authentication: Configured");
 } else {
-    console.log("API Key authentication: Not configured");
+  console.log("API Key authentication: Not configured");
 }
 
-if (config.oauth.clientId) {
-    console.log("OAuth authentication: Configured");
-    console.log(`  Authorize URL: ${config.oauth.authorizeUrl}`);
-    console.log(`  Redirect URI: ${config.oauth.redirectUri}`);
+if (config.database?.host) {
+  console.log("Database connection: Configured");
 } else {
-    console.log("OAuth authentication: Not configured");
+  console.log("Database connection: Not configured");
 }
 
 console.log("");
 console.log("Endpoints:");
+console.log(`  Landing: http://${config.server.host}:${config.server.port}/`);
 console.log(`  MCP: http://${config.server.host}:${config.server.port}/mcp`);
 console.log(
-    `  Health: http://${config.server.host}:${config.server.port}/health`,
-);
-console.log(
-    `  Metadata: http://${config.server.host}:${config.server.port}/.well-known/oauth-protected-resource`,
+  `  Health: http://${config.server.host}:${config.server.port}/health`,
 );
 console.log("");
 
 const server = serve(
-    {
-        fetch: app.fetch,
-        hostname: config.server.host,
-        port: config.server.port,
-    },
-    (info) => {
-        console.log(`Server running at http://${info.address}:${info.port}`);
-    },
+  {
+    fetch: app.fetch,
+    hostname: config.server.host,
+    port: config.server.port,
+  },
+  (info) => {
+    console.log(`Server running at http://${info.address}:${info.port}`);
+  },
 );
 
 // Handle server errors
 server.on("error", (err: NodeJS.ErrnoException) => {
-    if (err.code === "EADDRINUSE") {
-        console.error(`\nError: Port ${config.server.port} is already in use.`);
-        console.error(`Try: lsof -ti:${config.server.port} | xargs kill -9`);
-        console.error(`Or set a different port: PORT=3001 pnpm dev\n`);
-    } else {
-        console.error("Server error:", err);
-    }
-    process.exit(1);
+  if (err.code === "EADDRINUSE") {
+    console.error(`\nError: Port ${config.server.port} is already in use.`);
+    console.error(`Try: lsof -ti:${config.server.port} | xargs kill -9`);
+    console.error(`Or set a different port: PORT=3001 pnpm dev\n`);
+  } else {
+    console.error("Server error:", err);
+  }
+  process.exit(1);
 });

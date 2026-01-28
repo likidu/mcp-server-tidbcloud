@@ -1,22 +1,20 @@
 {
   "name": "@likidu/mcp-server-tidbcloud-remote",
   "version": "0.1.0",
-  "description": "Hosted MCP server for TiDB Cloud with OAuth support",
+  "description": "Hosted MCP server for TiDB Cloud on Vercel",
   "type": "module",
   "main": "dist/app.js",
   "scripts": {
     "dev": "dotenv -e ../../.env -- tsx watch src/dev.ts",
     "build": "tsc",
     "clean": "rm -rf dist",
-    "start": "node dist/dev.js",
-    "vercel-install": "cd ../.. && pnpm install && pnpm build"
+    "start": "node dist/dev.js"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
     "@likidu/mcp-server-tidbcloud": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.6.1",
-    "hono": "^4.6.0",
-    "zod": "^3.23.8"
+    "hono": "^4.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -33,7 +31,6 @@
     "tidb",
     "tidbcloud",
     "model-context-protocol",
-    "hono",
     "vercel"
   ],
   "license": "MIT"
