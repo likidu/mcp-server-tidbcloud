@@ -4,11 +4,15 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/mcp/:path*",
+      "destination": "/api/mcp"
+    },
+    {
       "source": "/mcp",
       "destination": "/api/mcp"
     },
     {
-      "source": "/((?!mcp).*)",
+      "source": "/(.*)",
       "destination": "/api"
     }
   ]

@@ -1,5 +1,5 @@
 /**
- * MCP Route Handler for Vercel
+ * MCP Serverless Function for Vercel
  * Uses mcp-handler package for proper serverless compatibility
  */
 
@@ -64,4 +64,10 @@ const handler = createMcpHandler(
   },
 );
 
-export { handler as GET, handler as POST, handler as DELETE };
+// Export for Vercel serverless functions
+export const GET = handler;
+export const POST = handler;
+export const DELETE = handler;
+
+// Default export for compatibility
+export default handler;
