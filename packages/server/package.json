@@ -1,43 +1,43 @@
 {
-    "name": "@likidu/mcp-server-tidbcloud",
-    "version": "0.1.0",
-    "description": "MCP server for TiDB Cloud API integration",
-    "type": "module",
-    "main": "dist/index.js",
-    "exports": {
-        ".": "./dist/index.js",
-        "./tools": "./dist/tools/index.js",
-        "./api": "./dist/api/client.js",
-        "./config": "./dist/config.js"
-    },
-    "bin": {
-        "tidbcloud-mcp-server": "dist/index.js"
-    },
-    "scripts": {
-        "start": "node dist/index.js",
-        "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
-        "build": "tsc",
-        "clean": "rm -rf dist"
-    },
-    "engines": {
-        "node": ">=18"
-    },
-    "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.6.1",
-        "@tidbcloud/serverless": "^0.2.0",
-        "zod": "^3.23.8"
-    },
-    "devDependencies": {
-        "@types/node": "^22.10.0",
-        "dotenv-cli": "^7.4.4",
-        "tsx": "^4.19.2",
-        "typescript": "^5.7.2"
-    },
-    "keywords": [
-        "mcp",
-        "tidb",
-        "tidbcloud",
-        "model-context-protocol"
-    ],
-    "license": "MIT"
+  "name": "@likidu/mcp-server-tidbcloud",
+  "version": "0.1.0",
+  "description": "MCP server for TiDB Cloud API integration",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./tools": "./dist/tools/index.js",
+    "./api": "./dist/api/client.js",
+    "./config": "./dist/config.js"
+  },
+  "bin": {
+    "tidbcloud-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "@tidbcloud/serverless": "^0.2.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "dotenv-cli": "^7.4.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "keywords": [
+    "mcp",
+    "tidb",
+    "tidbcloud",
+    "model-context-protocol"
+  ],
+  "license": "MIT"
 }
