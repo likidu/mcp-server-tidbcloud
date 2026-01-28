@@ -3,15 +3,10 @@
   "buildCommand": "cd ../.. && pnpm build",
   "installCommand": "cd ../.. && pnpm install",
   "framework": null,
-  "functions": {
-    "api/index.mjs": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/api/index.mjs"
+      "destination": "/api"
     }
   ],
   "headers": [
