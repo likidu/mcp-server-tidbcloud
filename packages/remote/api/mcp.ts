@@ -42,16 +42,26 @@ const databaseConfig = process.env.TIDB_CLOUD_DB_HOST
 
 const handler = createMcpHandler(
   (server) => {
-    if (!client) {
-      console.error("TiDB Cloud client not initialized - missing API keys");
-      return;
-    }
+    try {
+      if (!client) {
+        console.error("TiDB Cloud client not initialized - missing API keys");
+        return;
+      }
 
-    // Register all tools
-    registerRegionTools(server, client);
-    registerClusterTools(server, client);
-    registerBranchTools(server, client);
-    registerDatabaseTools(server, databaseConfig);
+      // Register all tools
+      console.log("Registering region tools...");
+      registerRegionTools(server, client);
+      console.log("Registering cluster tools...");
+      registerClusterTools(server, client);
+      console.log("Registering branch tools...");
+      registerBranchTools(server, client);
+      console.log("Registering database tools...");
+      registerDatabaseTools(server, databaseConfig);
+      console.log("All tools registered successfully");
+    } catch (error) {
+      console.error("Error registering tools:", error);
+      throw error;
+    }
   },
   {
     serverInfo: {
@@ -61,6 +71,7 @@ const handler = createMcpHandler(
   },
   {
     basePath: "/mcp",
+    verboseLogs: true,
   },
 );
 
