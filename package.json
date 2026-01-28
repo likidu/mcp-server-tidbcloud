@@ -7,6 +7,7 @@
         "build": "pnpm -r build",
         "clean": "pnpm -r clean",
         "dev": "pnpm --filter @likidu/mcp-server-tidbcloud dev",
+        "dev:remote": "pnpm --filter @likidu/mcp-server-tidbcloud-remote dev",
         "inspector": "dotenv -e .env -- npx @modelcontextprotocol/inspector node packages/server/dist/index.js"
     },
     "devDependencies": {
