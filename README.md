@@ -214,6 +214,31 @@ mcp-server-tidbcloud/
 - Free Starter clusters: point-in-time limited to last 24 hours
 - Paid clusters: point-in-time limited to last 14 days
 
+## Security
+
+### Security Considerations
+
+This MCP server grants powerful database management capabilities. Please review the following security guidance:
+
+- **Always review actions**: Review and authorize actions requested by the LLM before execution
+- **Development use**: This server is intended for local development and IDE integrations
+- **Production environments**: Not recommended for production without proper OAuth setup
+- **Access control**: Ensure only authorized users have access to your MCP server URL
+- **API key security**: Never expose your API keys in client-side code or public repositories
+- **Audit access**: Monitor usage and regularly audit who has access to your API keys
+
+### Environment Variable Security
+
+- Store API keys securely using environment variables or secret management tools
+- Never commit `.env` files containing real credentials
+- Rotate API keys periodically
+
+### Read-Only Mode
+
+For safer operations, the `db_query` tool only allows read-only SQL statements (SELECT, SHOW, DESCRIBE, EXPLAIN). For data modifications, use `db_execute` with caution.
+
+For more information, see the [MCP Security Best Practices](https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices).
+
 ## License
 
 MIT
