@@ -120,12 +120,19 @@ export default async function handler(
 
   // Return 401 if no valid token - this triggers OAuth flow in MCP clients
   if (!accessToken) {
-    // WWW-Authenticate header signals OAuth is required (RFC 6750)
-    res.setHeader("WWW-Authenticate", 'Bearer realm="tidbcloud"');
+    // Get the base URL for resource metadata
+    const host = req.headers.host || "mcp-server-tidbcloud-remote.vercel.app";
+    const scheme = req.headers["x-forwarded-proto"] || "https";
+    const baseUrl = `${scheme}://${host}`;
+
+    // WWW-Authenticate header with resource_metadata triggers OAuth flow in mcp-remote
+    res.setHeader(
+      "WWW-Authenticate",
+      `Bearer error="invalid_token", error_description="No authorization provided", resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
+    );
     res.status(401).json({
-      error: "unauthorized",
-      error_description:
-        "Authorization required. Please authenticate via OAuth.",
+      error: "invalid_token",
+      error_description: "No authorization provided",
     });
     return;
   }

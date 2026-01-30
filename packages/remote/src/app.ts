@@ -176,6 +176,23 @@ app.get("/api", (c) => {
 });
 
 // ============================================================
+// OAuth 2.0 Protected Resource Metadata
+// ============================================================
+
+app.get("/.well-known/oauth-protected-resource", (c) => {
+  const host = c.req.header("host") || config.server.serverHost;
+  const scheme = c.req.header("x-forwarded-proto") || "https";
+  const baseUrl = `${scheme}://${host}`;
+
+  return c.json({
+    resource: baseUrl,
+    authorization_servers: [baseUrl],
+    bearer_methods_supported: ["header"],
+    resource_documentation: "https://github.com/likidu/mcp-server-tidbcloud",
+  });
+});
+
+// ============================================================
 // OAuth 2.0 Authorization Server Metadata (RFC 8414)
 // ============================================================
 
