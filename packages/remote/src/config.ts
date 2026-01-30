@@ -15,12 +15,31 @@ export interface DatabaseConfig {
   database?: string;
 }
 
+/**
+ * Environment for TiDB Cloud API endpoints
+ * - dev: Uses dev.tidbcloud.com and serverless.dev.tidbapi.com
+ * - prod: Uses tidbcloud.com and serverless.tidbapi.com
+ */
+export type Environment = "dev" | "prod";
+
+/**
+ * Authentication mode for the TiDB Cloud API
+ */
+export type AuthMode = "oauth" | "digest";
+
 export interface Config {
   server: ServerConfig;
-  tidbCloud?: {
+  environment: Environment;
+  authMode?: AuthMode;
+  oauth?: {
+    clientId: string;
+    clientSecret: string;
+  };
+  digest?: {
     publicKey: string;
     privateKey: string;
   };
+  apiBaseUrl?: string;
   database?: DatabaseConfig;
 }
 
@@ -69,11 +88,46 @@ export function redactSensitiveData<T extends Record<string, unknown>>(
 }
 
 /**
+ * API base URLs for TiDB Cloud Serverless API
+ */
+const API_BASE_URLS: Record<Environment, string> = {
+  prod: "https://serverless.tidbapi.com",
+  dev: "https://serverless.dev.tidbapi.com",
+};
+
+/**
  * Loads configuration from environment variables
+ * OAuth is the default authentication mode if credentials are provided.
+ * Falls back to Digest (API Key) authentication if OAuth is not configured.
  */
 export function loadConfig(): Config {
   const serverHost = process.env.SERVER_HOST || "localhost:3000";
   const port = parseInt(process.env.PORT || "3000", 10);
+
+  // Determine environment (dev or prod, defaults to prod)
+  const envValue = process.env.TIDB_CLOUD_ENV?.toLowerCase();
+  const environment: Environment = envValue === "dev" ? "dev" : "prod";
+
+  // Check for OAuth credentials first (default mode)
+  const oauthClientId = process.env.TIDB_CLOUD_OAUTH_CLIENT_ID;
+  const oauthClientSecret = process.env.TIDB_CLOUD_OAUTH_CLIENT_SECRET;
+
+  // Check for Digest auth credentials (fallback)
+  const publicKey = process.env.TIDB_CLOUD_PUBLIC_KEY;
+  const privateKey = process.env.TIDB_CLOUD_PRIVATE_KEY;
+
+  // Determine auth mode
+  const hasOAuth = !!(oauthClientId && oauthClientSecret);
+  const hasDigest = !!(publicKey && privateKey);
+  const authMode: AuthMode | undefined = hasOAuth
+    ? "oauth"
+    : hasDigest
+      ? "digest"
+      : undefined;
+
+  // API base URL based on environment, can be overridden with TIDB_CLOUD_API_URL
+  const apiBaseUrl =
+    process.env.TIDB_CLOUD_API_URL || API_BASE_URLS[environment];
 
   return {
     server: {
@@ -81,12 +135,21 @@ export function loadConfig(): Config {
       port,
       serverHost,
     },
-    tidbCloud: process.env.TIDB_CLOUD_PUBLIC_KEY
+    environment,
+    authMode,
+    oauth: hasOAuth
       ? {
-          publicKey: process.env.TIDB_CLOUD_PUBLIC_KEY,
-          privateKey: process.env.TIDB_CLOUD_PRIVATE_KEY || "",
+          clientId: oauthClientId!,
+          clientSecret: oauthClientSecret!,
         }
       : undefined,
+    digest: hasDigest
+      ? {
+          publicKey: publicKey!,
+          privateKey: privateKey!,
+        }
+      : undefined,
+    apiBaseUrl,
     database: process.env.TIDB_CLOUD_DB_HOST
       ? {
           host: process.env.TIDB_CLOUD_DB_HOST,
@@ -99,10 +162,20 @@ export function loadConfig(): Config {
 }
 
 /**
- * Checks if API key authentication is configured
+ * Checks if any authentication is configured (OAuth or API key)
+ */
+export function isAuthConfigured(config: Config): boolean {
+  return !!(
+    (config.oauth?.clientId && config.oauth?.clientSecret) ||
+    (config.digest?.publicKey && config.digest?.privateKey)
+  );
+}
+
+/**
+ * Checks if API key authentication is configured (legacy alias)
  */
 export function isApiKeyConfigured(config: Config): boolean {
-  return !!(config.tidbCloud?.publicKey && config.tidbCloud?.privateKey);
+  return isAuthConfigured(config);
 }
 
 /**
@@ -122,9 +195,11 @@ export function validateConfig(config: Config): void {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  if (!isApiKeyConfigured(config)) {
+  if (!isAuthConfigured(config)) {
     errors.push(
-      "No authentication configured. Set TIDB_CLOUD_PUBLIC_KEY and TIDB_CLOUD_PRIVATE_KEY",
+      "No authentication configured. Set either:\n" +
+        "    - OAuth: TIDB_CLOUD_OAUTH_CLIENT_ID and TIDB_CLOUD_OAUTH_CLIENT_SECRET\n" +
+        "    - API Key: TIDB_CLOUD_PUBLIC_KEY and TIDB_CLOUD_PRIVATE_KEY",
     );
   }
 
@@ -132,6 +207,15 @@ export function validateConfig(config: Config): void {
     warnings.push(
       "Database connection not configured. SQL execution tools will require connection parameters.",
     );
+  }
+
+  // Log environment and auth mode being used
+  console.log(`[config] Environment: ${config.environment}`);
+  if (config.authMode) {
+    console.log(
+      `[config] Authentication mode: ${config.authMode === "oauth" ? "OAuth" : "Digest (API Key)"}`,
+    );
+    console.log(`[config] API base URL: ${config.apiBaseUrl}`);
   }
 
   for (const warning of warnings) {
