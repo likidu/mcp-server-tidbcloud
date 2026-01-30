@@ -1,12 +1,11 @@
 /**
  * MCP Serverless Function for Vercel
- * Uses @modelcontextprotocol/sdk with streamable HTTP transport
  *
  * Authentication:
  * - Supports OAuth 2.1 per MCP specification
  * - Users authenticate via /authorize -> TiDB Cloud OAuth -> /callback -> /token
  * - Access token is passed in Authorization: Bearer <token> header
- * - Returns 401 if no valid token is provided
+ * - Returns 401 if no valid token is provided (triggers OAuth flow in MCP clients)
  */
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -19,64 +18,48 @@ import {
   registerDatabaseTools,
 } from "@likidu/mcp-server-tidbcloud/tools";
 import { TiDBCloudClient } from "@likidu/mcp-server-tidbcloud/api";
-import type {
-  Config,
-  AuthMode,
-  Environment,
-} from "@likidu/mcp-server-tidbcloud/config";
+import type { Config, Environment } from "@likidu/mcp-server-tidbcloud/config";
 
-/**
- * API base URLs for TiDB Cloud Serverless API
- */
+// ============================================================
+// Constants
+// ============================================================
+
 const API_BASE_URLS: Record<Environment, string> = {
   prod: "https://serverless.tidbapi.com",
   dev: "https://serverless.dev.tidbapi.com",
 };
 
-/**
- * Get environment from env var (defaults to prod)
- */
+// ============================================================
+// Helper Functions
+// ============================================================
+
 function getEnvironment(): Environment {
-  const envValue = process.env.TIDB_CLOUD_ENV?.toLowerCase();
-  return envValue === "dev" ? "dev" : "prod";
+  return process.env.TIDB_CLOUD_ENV?.toLowerCase() === "dev" ? "dev" : "prod";
 }
 
-/**
- * Extract Bearer token from Authorization header
- */
 function extractBearerToken(authHeader: string | undefined): string | null {
   if (!authHeader) return null;
   const match = authHeader.match(/^Bearer\s+(.+)$/i);
   return match ? match[1] : null;
 }
 
-/**
- * Create API client with the user's access token
- */
-function createClientWithToken(accessToken: string): TiDBCloudClient {
+function createClient(accessToken: string): TiDBCloudClient {
   const environment = getEnvironment();
-  const apiBaseUrl =
-    process.env.TIDB_CLOUD_API_URL || API_BASE_URLS[environment];
-
   const config: Config = {
     environment,
     authMode: "oauth",
     oauth: {
-      clientId: process.env.TIDB_CLOUD_OAUTH_CLIENT_ID || "",
-      clientSecret: process.env.TIDB_CLOUD_OAUTH_CLIENT_SECRET || "",
+      clientId: "",
+      clientSecret: "",
       accessToken,
     },
-    apiBaseUrl,
+    apiBaseUrl: process.env.TIDB_CLOUD_API_URL || API_BASE_URLS[environment],
   };
-
   return new TiDBCloudClient(config);
 }
 
-// Database config (optional)
 function getDatabaseConfig() {
-  if (!process.env.TIDB_CLOUD_DB_HOST) {
-    return undefined;
-  }
+  if (!process.env.TIDB_CLOUD_DB_HOST) return undefined;
   return {
     host: process.env.TIDB_CLOUD_DB_HOST,
     username: process.env.TIDB_CLOUD_DB_USER || "",
@@ -85,22 +68,17 @@ function getDatabaseConfig() {
   };
 }
 
-/**
- * Create and configure MCP server with user's access token
- */
 function createServer(accessToken: string): McpServer {
   const server = new McpServer({
     name: "tidbcloud-mcp-server",
     version: "0.1.0",
   });
 
-  const client = createClientWithToken(accessToken);
-  const databaseConfig = getDatabaseConfig();
-
+  const client = createClient(accessToken);
   registerRegionTools(server, client);
   registerClusterTools(server, client);
   registerBranchTools(server, client);
-  registerDatabaseTools(server, databaseConfig);
+  registerDatabaseTools(server, getDatabaseConfig());
 
   return server;
 }
