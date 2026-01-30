@@ -8,7 +8,8 @@
     ".": "./dist/index.js",
     "./tools": "./dist/tools/index.js",
     "./api": "./dist/api/client.js",
-    "./config": "./dist/config.js"
+    "./config": "./dist/config.js",
+    "./mcp": "./dist/mcp.js"
   },
   "bin": {
     "tidbcloud-mcp-server": "dist/index.js"

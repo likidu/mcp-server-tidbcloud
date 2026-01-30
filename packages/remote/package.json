@@ -13,7 +13,6 @@
   "dependencies": {
     "@hono/node-server": "^1.13.0",
     "@likidu/mcp-server-tidbcloud": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.6.1",
     "@vercel/analytics": "^1.4.1",
     "hono": "^4.6.0"
   },

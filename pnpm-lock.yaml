@@ -23,9 +23,6 @@ importers:
       '@likidu/mcp-server-tidbcloud':
         specifier: workspace:*
         version: link:../server
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.6.1
-        version: 1.25.3(hono@4.11.7)(zod@3.25.76)
       '@vercel/analytics':
         specifier: ^1.4.1
         version: 1.6.1
