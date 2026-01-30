@@ -120,6 +120,8 @@ export default async function handler(
 
   // Return 401 if no valid token - this triggers OAuth flow in MCP clients
   if (!accessToken) {
+    // WWW-Authenticate header signals OAuth is required (RFC 6750)
+    res.setHeader("WWW-Authenticate", 'Bearer realm="tidbcloud"');
     res.status(401).json({
       error: "unauthorized",
       error_description:
