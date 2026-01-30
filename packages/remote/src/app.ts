@@ -284,7 +284,8 @@ app.get("/authorize", (c) => {
 
   const host = c.req.header("host") || config.server.serverHost;
   const scheme = c.req.header("x-forwarded-proto") || "https";
-  const ourCallbackUri = `${scheme}://${host}/callback`;
+  // Use /oauth/callback to match the registered OAuth app redirect URI
+  const ourCallbackUri = `${scheme}://${host}/oauth/callback`;
 
   const tidbAuthUrl = new URL(
     TIDB_OAUTH_ENDPOINTS[config.environment].authorize,
@@ -610,6 +611,140 @@ app.post("/token", async (c) => {
     },
     400,
   );
+});
+
+// ============================================================
+// Alias: /oauth/callback (for backward compatibility with registered OAuth app)
+// ============================================================
+
+app.get("/oauth/callback", async (c) => {
+  const code = c.req.query("code");
+  const stateParam = c.req.query("state");
+  const error = c.req.query("error");
+  const errorDescription = c.req.query("error_description");
+
+  if (error) {
+    const internalState = stateParam?.split(":")[0];
+    const stateData = internalState
+      ? authorizationStates.get(internalState)
+      : null;
+
+    if (stateData) {
+      const redirectUrl = new URL(stateData.redirectUri);
+      redirectUrl.searchParams.set("error", error);
+      if (errorDescription) {
+        redirectUrl.searchParams.set("error_description", errorDescription);
+      }
+      authorizationStates.delete(internalState!);
+      return c.redirect(redirectUrl.toString());
+    }
+
+    return c.json({ error, error_description: errorDescription }, 400);
+  }
+
+  if (!code || !stateParam) {
+    return c.json(
+      { error: "invalid_request", error_description: "Missing code or state" },
+      400,
+    );
+  }
+
+  const [internalState, ...clientStateParts] = stateParam.split(":");
+  const clientState = clientStateParts.join(":");
+
+  const stateData = authorizationStates.get(internalState);
+  if (!stateData) {
+    return c.json(
+      {
+        error: "invalid_request",
+        error_description: "Invalid or expired state",
+      },
+      400,
+    );
+  }
+
+  const serverClientId = config.oauth?.clientId;
+  const serverClientSecret = config.oauth?.clientSecret;
+
+  if (!serverClientId || !serverClientSecret) {
+    return c.json(
+      { error: "server_error", error_description: "OAuth not configured" },
+      500,
+    );
+  }
+
+  const host = c.req.header("host") || config.server.serverHost;
+  const scheme = c.req.header("x-forwarded-proto") || "https";
+  // Use /oauth/callback as the redirect_uri since that's what's registered
+  const ourCallbackUri = `${scheme}://${host}/oauth/callback`;
+
+  try {
+    const tokenUrl = TIDB_OAUTH_ENDPOINTS[config.environment].token;
+    const tokenResponse = await fetch(tokenUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: serverClientId,
+        client_secret: serverClientSecret,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: ourCallbackUri,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error("TiDB Cloud token exchange failed:", errorText);
+
+      const redirectUrl = new URL(stateData.redirectUri);
+      redirectUrl.searchParams.set("error", "server_error");
+      redirectUrl.searchParams.set(
+        "error_description",
+        "Failed to exchange token with TiDB Cloud",
+      );
+      authorizationStates.delete(internalState);
+      return c.redirect(redirectUrl.toString());
+    }
+
+    const tokenData = (await tokenResponse.json()) as {
+      access_token: string;
+      token_type: string;
+      expires_in: number;
+      refresh_token?: string;
+    };
+
+    const ourAuthCode = generateRandomString(32);
+    authorizationCodes.set(ourAuthCode, {
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token,
+      expiresIn: tokenData.expires_in,
+      redirectUri: stateData.redirectUri,
+      codeChallenge: stateData.codeChallenge,
+      codeChallengeMethod: stateData.codeChallengeMethod,
+      createdAt: Date.now(),
+    });
+
+    authorizationStates.delete(internalState);
+
+    const redirectUrl = new URL(stateData.redirectUri);
+    redirectUrl.searchParams.set("code", ourAuthCode);
+    if (clientState) {
+      redirectUrl.searchParams.set("state", clientState);
+    }
+
+    return c.redirect(redirectUrl.toString());
+  } catch (err) {
+    console.error("OAuth callback error:", err);
+
+    const redirectUrl = new URL(stateData.redirectUri);
+    redirectUrl.searchParams.set("error", "server_error");
+    redirectUrl.searchParams.set(
+      "error_description",
+      err instanceof Error ? err.message : "Unknown error",
+    );
+    authorizationStates.delete(internalState);
+    return c.redirect(redirectUrl.toString());
+  }
 });
 
 // ============================================================
