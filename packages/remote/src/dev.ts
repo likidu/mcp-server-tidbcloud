@@ -16,10 +16,12 @@ console.log(`Port: ${config.server.port}`);
 console.log(`Server Host: ${config.server.serverHost}`);
 console.log("");
 
-if (config.tidbCloud?.publicKey) {
-  console.log("API Key authentication: Configured");
+if (config.authMode) {
+  const authType = config.authMode === "oauth" ? "OAuth" : "API Key (Digest)";
+  console.log(`Authentication: ${authType}`);
+  console.log(`API Base URL: ${config.apiBaseUrl}`);
 } else {
-  console.log("API Key authentication: Not configured");
+  console.log("Authentication: Not configured");
 }
 
 if (config.database?.host) {

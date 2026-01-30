@@ -3,7 +3,7 @@
  */
 
 import { createHash } from "crypto";
-import type { Config } from "../config.js";
+import type { Config, AuthMode, Environment } from "../config.js";
 import type {
   Branch,
   CreateBranchRequest,
@@ -15,6 +15,25 @@ import type {
   ListRegionsResponse,
   ApiError,
 } from "./types.js";
+
+/**
+ * OAuth token response from TiDB Cloud
+ */
+interface OAuthTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token?: string;
+}
+
+/**
+ * Cached OAuth access token
+ */
+interface CachedToken {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt: number;
+}
 
 /**
  * Custom error class for TiDB Cloud API errors
@@ -59,19 +78,215 @@ function generateCnonce(): string {
 }
 
 /**
- * TiDB Cloud API client for making authenticated requests using Digest Authentication
+ * OAuth endpoints for TiDB Cloud by environment
+ * - Authorization: Browser redirect for user consent
+ * - Token: Backend API for token exchange
+ */
+const OAUTH_ENDPOINTS: Record<
+  Environment,
+  { authorize: string; token: string }
+> = {
+  dev: {
+    authorize: "https://dev.tidbcloud.com/oauth/authorize",
+    token: "https://oauth.dev.tidbcloud.com/v1/token",
+  },
+  prod: {
+    authorize: "https://tidbcloud.com/oauth/authorize",
+    token: "https://oauth.tidbcloud.com/v1/token",
+  },
+};
+
+/**
+ * TiDB Cloud API client for making authenticated requests
+ * Supports both OAuth (Bearer token) and Digest Authentication
  */
 export class TiDBCloudClient {
   private readonly baseUrl: string;
-  private readonly publicKey: string;
-  private readonly privateKey: string;
+  private readonly authMode: AuthMode;
+  private readonly environment: Environment;
   private readonly timeout: number;
+
+  // Digest auth credentials
+  private readonly publicKey?: string;
+  private readonly privateKey?: string;
+
+  // OAuth credentials
+  private readonly oauthClientId?: string;
+  private readonly oauthClientSecret?: string;
+  private readonly oauthRedirectUri?: string;
+  private cachedToken?: CachedToken;
 
   constructor(config: Config, timeout = 30000) {
     this.baseUrl = config.apiBaseUrl;
-    this.publicKey = config.publicKey;
-    this.privateKey = config.privateKey;
+    this.authMode = config.authMode;
+    this.environment = config.environment;
     this.timeout = timeout;
+
+    if (config.authMode === "oauth" && config.oauth) {
+      this.oauthClientId = config.oauth.clientId;
+      this.oauthClientSecret = config.oauth.clientSecret;
+      this.oauthRedirectUri = config.oauth.redirectUri;
+
+      // If access token is pre-provided, cache it
+      if (config.oauth.accessToken) {
+        this.cachedToken = {
+          accessToken: config.oauth.accessToken,
+          // Assume long expiry for pre-provided tokens (can be refreshed if needed)
+          expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+        };
+      }
+    } else if (config.authMode === "digest" && config.digest) {
+      this.publicKey = config.digest.publicKey;
+      this.privateKey = config.digest.privateKey;
+    }
+  }
+
+  /**
+   * Generates the OAuth authorization URL for the user to visit
+   */
+  getAuthorizationUrl(state?: string): string {
+    if (!this.oauthClientId || !this.oauthRedirectUri) {
+      throw new TiDBCloudApiError(
+        "OAuth client_id and redirect_uri are required for authorization",
+        400,
+      );
+    }
+    const params = new URLSearchParams({
+      client_id: this.oauthClientId,
+      redirect_uri: this.oauthRedirectUri,
+      scope: "org:owner",
+      response_type: "code",
+    });
+    if (state) {
+      params.set("state", state);
+    }
+    const authorizeUrl = OAUTH_ENDPOINTS[this.environment].authorize;
+    return `${authorizeUrl}?${params.toString()}`;
+  }
+
+  /**
+   * Exchanges an authorization code for an access token
+   */
+  async exchangeCodeForToken(code: string): Promise<string> {
+    if (
+      !this.oauthClientId ||
+      !this.oauthClientSecret ||
+      !this.oauthRedirectUri
+    ) {
+      throw new TiDBCloudApiError(
+        "OAuth credentials not fully configured",
+        400,
+      );
+    }
+
+    const tokenUrl = OAUTH_ENDPOINTS[this.environment].token;
+    const response = await fetch(tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        client_id: this.oauthClientId,
+        client_secret: this.oauthClientSecret,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: this.oauthRedirectUri,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new TiDBCloudApiError(
+        `Failed to exchange code for token: ${errorText}`,
+        response.status,
+      );
+    }
+
+    const tokenResponse = (await response.json()) as OAuthTokenResponse;
+    this.cachedToken = {
+      accessToken: tokenResponse.access_token,
+      refreshToken: tokenResponse.refresh_token,
+      expiresAt: Date.now() + tokenResponse.expires_in * 1000,
+    };
+
+    return this.cachedToken.accessToken;
+  }
+
+  /**
+   * Sets the access token directly (for tokens obtained externally)
+   */
+  setAccessToken(accessToken: string, expiresIn?: number): void {
+    this.cachedToken = {
+      accessToken,
+      expiresAt: Date.now() + (expiresIn || 24 * 60 * 60) * 1000,
+    };
+  }
+
+  /**
+   * Gets a valid OAuth access token
+   * For Authorization Code Flow, the token must be obtained via the callback
+   */
+  private async getOAuthToken(): Promise<string> {
+    // Check if we have a valid cached token (with 60s buffer)
+    if (this.cachedToken && this.cachedToken.expiresAt > Date.now() + 60000) {
+      return this.cachedToken.accessToken;
+    }
+
+    // Try to refresh if we have a refresh token
+    if (this.cachedToken?.refreshToken) {
+      try {
+        return await this.refreshOAuthToken(this.cachedToken.refreshToken);
+      } catch {
+        // Refresh failed, need to re-authenticate
+        this.cachedToken = undefined;
+      }
+    }
+
+    // No valid token - user needs to authenticate via Authorization Code Flow
+    if (this.oauthRedirectUri) {
+      const authUrl = this.getAuthorizationUrl();
+      throw new TiDBCloudApiError(
+        `OAuth authentication required. Please visit: ${authUrl}`,
+        401,
+      );
+    }
+
+    throw new TiDBCloudApiError(
+      "OAuth access token not available. Please authenticate first or provide TIDB_CLOUD_OAUTH_ACCESS_TOKEN.",
+      401,
+    );
+  }
+
+  /**
+   * Refreshes the OAuth token using a refresh token
+   */
+  private async refreshOAuthToken(refreshToken: string): Promise<string> {
+    const tokenUrl = OAUTH_ENDPOINTS[this.environment].token;
+    const response = await fetch(tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        client_id: this.oauthClientId!,
+        client_secret: this.oauthClientSecret!,
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new TiDBCloudApiError("Failed to refresh token", response.status);
+    }
+
+    const tokenResponse = (await response.json()) as OAuthTokenResponse;
+    this.cachedToken = {
+      accessToken: tokenResponse.access_token,
+      refreshToken: tokenResponse.refresh_token || refreshToken,
+      expiresAt: Date.now() + tokenResponse.expires_in * 1000,
+    };
+
+    return this.cachedToken.accessToken;
   }
 
   /**
@@ -119,9 +334,94 @@ export class TiDBCloudClient {
   }
 
   /**
-   * Makes an authenticated request to the TiDB Cloud API using Digest Authentication
+   * Makes an authenticated request to the TiDB Cloud API
+   * Uses OAuth Bearer token or Digest Authentication based on config
    */
   private async request<T>(
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    if (this.authMode === "oauth") {
+      return this.requestWithOAuth<T>(method, path, body);
+    } else {
+      return this.requestWithDigest<T>(method, path, body);
+    }
+  }
+
+  /**
+   * Makes an authenticated request using OAuth Bearer token
+   */
+  private async requestWithOAuth<T>(
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    const url = `${this.baseUrl}${path}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+    try {
+      const accessToken = await this.getOAuthToken();
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // If token expired, clear cache and retry once
+      if (response.status === 401) {
+        this.cachedToken = undefined;
+        const newToken = await this.getOAuthToken();
+
+        const retryResponse = await fetch(url, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${newToken}`,
+          },
+          body: body ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        });
+
+        return this.handleResponse<T>(retryResponse);
+      }
+
+      return this.handleResponse<T>(response);
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      if (error instanceof TiDBCloudApiError) {
+        throw error;
+      }
+
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          throw new TiDBCloudApiError(
+            "Request timed out. Please try again.",
+            408,
+          );
+        }
+        throw new TiDBCloudApiError(`Network error: ${error.message}`, 0);
+      }
+
+      throw new TiDBCloudApiError("An unexpected error occurred", 0);
+    }
+  }
+
+  /**
+   * Makes an authenticated request using Digest Authentication
+   */
+  private async requestWithDigest<T>(
     method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
     path: string,
     body?: unknown,
