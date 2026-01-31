@@ -12,28 +12,8 @@
       "destination": "/api/mcp"
     },
     {
-      "source": "/register",
-      "destination": "/api/register"
-    },
-    {
-      "source": "/authorize",
-      "destination": "/api/authorize"
-    },
-    {
-      "source": "/token",
-      "destination": "/api/token"
-    },
-    {
-      "source": "/callback",
-      "destination": "/api/callback"
-    },
-    {
-      "source": "/oauth/callback",
-      "destination": "/api/oauth/callback"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/api"
+      "source": "/:path*",
+      "destination": "/api?path=:path*"
     }
   ]
 }
