@@ -4,7 +4,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { decodeAuthCode } from "../dist/oauth-state.js";
+import { getStore } from "../dist/store/index.js";
 import { loadConfig, type Environment } from "../dist/config.js";
 
 const config = loadConfig();
@@ -103,8 +103,9 @@ export default async function handler(
         return;
       }
 
-      // Decode the authorization code (contains token data encoded as base64url JSON)
-      const codeData = decodeAuthCode(code);
+      // Retrieve and delete the authorization code from Redis (one-time use)
+      const store = getStore();
+      const codeData = await store.getAndDeleteCode(code);
       if (!codeData) {
         res.statusCode = 400;
         res.end(
@@ -158,9 +159,6 @@ export default async function handler(
           return;
         }
       }
-
-      // Note: With encoded auth codes, we can't prevent replay attacks
-      // In production, use a database to track used codes
 
       res.statusCode = 200;
       res.end(

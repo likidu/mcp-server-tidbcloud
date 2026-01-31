@@ -65,16 +65,14 @@ const TIDB_OAUTH_ENDPOINTS: Record<
 const OAUTH_SCOPE = "org:owner";
 
 // ============================================================
-// OAuth State Storage (shared module for use by direct API handlers)
+// OAuth Store (Redis-based, serverless-safe)
 // ============================================================
 
-import {
-  type AuthorizationState,
-  generateRandomString,
-  encodeState,
-  decodeState,
-  encodeAuthCode,
-} from "./oauth-state.js";
+import { getStore, type AuthorizationState } from "./store/index.js";
+import { generateRandomString } from "./oauth-state.js";
+
+const OAUTH_STATE_TTL = 600; // 10 minutes
+const OAUTH_CODE_TTL = 300; // 5 minutes
 
 // ============================================================
 // Hono App Setup
@@ -211,7 +209,7 @@ app.post("/api/register", async (c) => {
 // Authorization Endpoint
 // ============================================================
 
-app.get("/api/authorize", (c) => {
+app.get("/api/authorize", async (c) => {
   const clientId = c.req.query("client_id");
   const redirectUri = c.req.query("redirect_uri");
   const responseType = c.req.query("response_type");
@@ -250,7 +248,8 @@ app.get("/api/authorize", (c) => {
     );
   }
 
-  // Encode all state data in the state parameter (serverless-safe)
+  // Store state data in Redis with a random key
+  const stateKey = generateRandomString(32);
   const stateData: AuthorizationState = {
     redirectUri,
     codeChallenge,
@@ -259,7 +258,9 @@ app.get("/api/authorize", (c) => {
     clientState: state, // Preserve the original client state
     createdAt: Date.now(),
   };
-  const encodedState = encodeState(stateData);
+
+  const store = getStore();
+  await store.setState(stateKey, stateData, OAUTH_STATE_TTL);
 
   const host = c.req.header("host") || config.server.serverHost;
   const scheme = c.req.header("x-forwarded-proto") || "https";
@@ -273,7 +274,7 @@ app.get("/api/authorize", (c) => {
   tidbAuthUrl.searchParams.set("redirect_uri", ourCallbackUri);
   tidbAuthUrl.searchParams.set("scope", OAUTH_SCOPE);
   tidbAuthUrl.searchParams.set("response_type", "code");
-  tidbAuthUrl.searchParams.set("state", encodedState);
+  tidbAuthUrl.searchParams.set("state", stateKey);
 
   return c.redirect(tidbAuthUrl.toString());
 });
@@ -287,15 +288,17 @@ app.get("/api/authorize", (c) => {
 
 app.get("/oauth/callback", async (c) => {
   const code = c.req.query("code");
-  const stateParam = c.req.query("state");
+  const stateKey = c.req.query("state");
   const error = c.req.query("error");
   const errorDescription = c.req.query("error_description");
 
-  // Decode state from the state parameter (serverless-safe)
-  const stateData = stateParam ? decodeState(stateParam) : null;
+  // Retrieve state from Redis using the state key
+  const store = getStore();
+  const stateData = stateKey ? await store.getState(stateKey) : null;
 
   if (error) {
     if (stateData) {
+      await store.deleteState(stateKey!);
       const redirectUrl = new URL(stateData.redirectUri);
       redirectUrl.searchParams.set("error", error);
       if (errorDescription) {
@@ -306,7 +309,7 @@ app.get("/oauth/callback", async (c) => {
     return c.json({ error, error_description: errorDescription }, 400);
   }
 
-  if (!code || !stateParam) {
+  if (!code || !stateKey) {
     return c.json(
       { error: "invalid_request", error_description: "Missing code or state" },
       400,
@@ -322,6 +325,9 @@ app.get("/oauth/callback", async (c) => {
       400,
     );
   }
+
+  // Delete state immediately (one-time use)
+  await store.deleteState(stateKey);
 
   const serverClientId = config.oauth?.clientId;
   const serverClientSecret = config.oauth?.clientSecret;
@@ -372,17 +378,21 @@ app.get("/oauth/callback", async (c) => {
       refresh_token?: string;
     };
 
-    // Encode the token data into the authorization code itself
-    // This makes it serverless-safe (no in-memory state needed)
-    const ourAuthCode = encodeAuthCode({
-      accessToken: tokenData.access_token,
-      refreshToken: tokenData.refresh_token,
-      expiresIn: tokenData.expires_in,
-      redirectUri: stateData.redirectUri,
-      codeChallenge: stateData.codeChallenge,
-      codeChallengeMethod: stateData.codeChallengeMethod,
-      createdAt: Date.now(),
-    });
+    // Store the authorization code with token data in Redis
+    const ourAuthCode = generateRandomString(32);
+    await store.setCode(
+      ourAuthCode,
+      {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresIn: tokenData.expires_in,
+        redirectUri: stateData.redirectUri,
+        codeChallenge: stateData.codeChallenge,
+        codeChallengeMethod: stateData.codeChallengeMethod,
+        createdAt: Date.now(),
+      },
+      OAUTH_CODE_TTL,
+    );
 
     const redirectUrl = new URL(stateData.redirectUri);
     redirectUrl.searchParams.set("code", ourAuthCode);
