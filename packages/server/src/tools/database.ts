@@ -219,10 +219,17 @@ export function registerDatabaseTools(
 
 Executes SHOW DATABASES and returns the list of database names.
 
+**Database credentials required.** Before calling this tool, ask the user which option they prefer:
+1. Provide credentials in chat (pass as host, username, password parameters)
+2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+
+If user chooses option 2, show them the claude_desktop_config.json example with mcp-remote --header flags.
+Use tidbcloud_get_cluster to get the host and port for the cluster.
+
 Args:
-  - host (string, optional): Database host override
-  - username (string, optional): Username override
-  - password (string, optional): Password override
+  - host (string, optional): Database host
+  - username (string, optional): Database username
+  - password (string, optional): Database password
 
 Returns:
   List of database names in the cluster.`,
@@ -276,11 +283,15 @@ Returns:
 
 Executes SHOW TABLES and returns the list of table names.
 
+**Database credentials required.** Before calling this tool, ask the user which option they prefer:
+1. Provide credentials in chat (pass as host, username, password parameters)
+2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+
 Args:
   - database (string, required): The database to list tables from
-  - host (string, optional): Database host override
-  - username (string, optional): Username override
-  - password (string, optional): Password override
+  - host (string, optional): Database host
+  - username (string, optional): Database username
+  - password (string, optional): Database password
 
 Returns:
   List of table names in the database.`,
@@ -337,12 +348,16 @@ Returns:
 Only SELECT, SHOW, DESCRIBE, and EXPLAIN statements are allowed.
 Results are returned as a formatted markdown table.
 
+**Database credentials required.** Before calling this tool, ask the user which option they prefer:
+1. Provide credentials in chat (pass as host, username, password parameters)
+2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+
 Args:
   - sql (string, required): The read-only SQL query to execute
   - database (string, optional): Database to use for the query
-  - host (string, optional): Database host override
-  - username (string, optional): Username override
-  - password (string, optional): Password override
+  - host (string, optional): Database host
+  - username (string, optional): Database username
+  - password (string, optional): Database password
 
 Returns:
   Query results as a markdown table.`,
@@ -415,12 +430,16 @@ Can execute a single statement or multiple statements in sequence.
 
 **WARNING:** This tool can modify or delete data. Use with caution.
 
+**Database credentials required.** Before calling this tool, ask the user which option they prefer:
+1. Provide credentials in chat (pass as host, username, password parameters)
+2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+
 Args:
   - sql (string | string[], required): SQL statement(s) to execute
   - database (string, optional): Database to use
-  - host (string, optional): Database host override
-  - username (string, optional): Username override
-  - password (string, optional): Password override
+  - host (string, optional): Database host
+  - username (string, optional): Database username
+  - password (string, optional): Database password
 
 Returns:
   Number of rows affected by each statement.`,
@@ -489,13 +508,17 @@ Returns:
 
 Creates a user with the specified username, password, and host restriction.
 
+**Admin credentials required.** Before calling this tool, ask the user which option they prefer:
+1. Provide credentials in chat (pass as host, adminUsername, adminPassword parameters)
+2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+
 Args:
   - username (string, required): Username for the new user
   - password (string, required): Password for the new user
   - userHost (string, optional): Host restriction (default: '%' for any host)
-  - host (string, optional): Admin database host override
-  - adminUsername (string, optional): Admin username override
-  - adminPassword (string, optional): Admin password override
+  - host (string, optional): Admin database host
+  - adminUsername (string, optional): Admin username
+  - adminPassword (string, optional): Admin password
 
 Returns:
   Success message with created user information.`,
@@ -557,12 +580,16 @@ Returns:
 
 **WARNING:** This action is irreversible. The user will be permanently deleted.
 
+**Admin credentials required.** Before calling this tool, ask the user which option they prefer:
+1. Provide credentials in chat (pass as host, adminUsername, adminPassword parameters)
+2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+
 Args:
   - username (string, required): Username of the user to remove
   - userHost (string, optional): Host specification (default: '%')
-  - host (string, optional): Admin database host override
-  - adminUsername (string, optional): Admin username override
-  - adminPassword (string, optional): Admin password override
+  - host (string, optional): Admin database host
+  - adminUsername (string, optional): Admin username
+  - adminPassword (string, optional): Admin password
 
 Returns:
   Success message confirming user removal.`,
