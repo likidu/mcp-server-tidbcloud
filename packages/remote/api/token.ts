@@ -214,6 +214,7 @@ export default async function handler(
       }
 
       // Look up and delete the refresh token (one-time use for rotation)
+      const store = getStore();
       const tokenData = await store.getAndDeleteRefreshToken(refreshToken);
       if (!tokenData) {
         // Token not found - either invalid, expired, or already used (potential theft)
