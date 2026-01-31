@@ -7,10 +7,11 @@ An MCP (Model Context Protocol) server that enables LLMs to interact with TiDB C
 - **Cluster Management**: Create, list, update, and delete TiDB Cloud Serverless clusters
 - **Branch Management**: Create, list, get, and delete branches for clusters
 - **Database Operations**: Execute SQL queries and manage database schemas
+- **Region Discovery**: List available regions for cluster creation
 - **Async Operation Support**: Proper handling of long-running operations with status checking
 - **Two Transport Options**:
   - **stdio**: Local server for Claude Desktop (API keys in config)
-  - **HTTP**: Remote server for hosted deployments (Vercel, etc.)
+  - **Streamable HTTP**: Remote server for hosted deployments with OAuth authentication
 
 ## Prerequisites
 
@@ -22,7 +23,7 @@ An MCP (Model Context Protocol) server that enables LLMs to interact with TiDB C
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/mcp-server-tidbcloud.git
+git clone https://github.com/tidbcloud/mcp-server-tidbcloud.git
 cd mcp-server-tidbcloud
 
 # Install dependencies
@@ -38,15 +39,50 @@ There are two ways to use this MCP server with Claude Desktop:
 
 ### Option 1: Remote Server (Recommended)
 
-Connect to the hosted MCP server. No local setup or API keys needed.
+Connect to the hosted MCP server using `mcp-remote`. No local setup or API keys needed - you'll authenticate with your TiDB Cloud account via OAuth.
 
-> **Note:** Remote MCP servers require Claude Pro, Max, Team, or Enterprise plan.
+**Basic Configuration:**
 
-1. Open Claude Desktop
-2. Go to **Settings** → **Connectors** → **Add custom connector**
-3. Enter the server URL: `https://mcp-server-tidbcloud-remote.vercel.app/mcp`
+```json
+{
+  "mcpServers": {
+    "TiDB Cloud": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp-server-tidbcloud-remote.vercel.app/mcp"]
+    }
+  }
+}
+```
 
-> **Important:** Remote MCP servers must be configured via the Claude Desktop UI, not via `claude_desktop_config.json`.
+When you first use the server, you'll be prompted to authenticate with your TiDB Cloud account.
+
+**With Database Credentials (for SQL operations):**
+
+To use database tools (`show_databases`, `db_query`, `db_execute`, etc.), configure your database credentials. The credentials are stored locally and sent via custom headers:
+
+```json
+{
+  "mcpServers": {
+    "TiDB Cloud": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "https://mcp-server-tidbcloud-remote.vercel.app/mcp",
+        "--header", "X-TiDB-DB-Host:${TIDB_CLOUD_DB_HOST}",
+        "--header", "X-TiDB-DB-User:${TIDB_CLOUD_DB_USER}",
+        "--header", "X-TiDB-DB-Password:${TIDB_CLOUD_DB_PASSWORD}"
+      ],
+      "env": {
+        "TIDB_CLOUD_DB_HOST": "gateway01.us-east-1.prod.aws.tidbcloud.com",
+        "TIDB_CLOUD_DB_USER": "your-username",
+        "TIDB_CLOUD_DB_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
+To get your cluster's host, use the `tidbcloud_get_cluster` tool - it will display the connection endpoint. Your username format is typically `{userPrefix}.root` where `userPrefix` is shown in the cluster details.
 
 ### Option 2: Local Server (stdio)
 
@@ -76,6 +112,9 @@ Add the following to your Claude Desktop configuration file (`claude_desktop_con
 | `TIDB_CLOUD_PUBLIC_KEY` | Yes | TiDB Cloud API public key |
 | `TIDB_CLOUD_PRIVATE_KEY` | Yes | TiDB Cloud API private key |
 | `TIDB_CLOUD_API_URL` | No | API base URL (defaults to `https://serverless.tidbapi.com`) |
+| `TIDB_CLOUD_DB_HOST` | No | Default database host for SQL operations |
+| `TIDB_CLOUD_DB_USER` | No | Default database username |
+| `TIDB_CLOUD_DB_PASSWORD` | No | Default database password |
 
 ### Getting Your API Keys
 
@@ -86,6 +125,14 @@ Add the following to your Claude Desktop configuration file (`claude_desktop_con
 5. Copy both the **Public Key** and **Private Key** (save the private key securely - it won't be shown again)
 
 ## Available Tools
+
+### Region Tools
+
+#### `tidbcloud_list_regions`
+
+Lists all available regions for TiDB Cloud Serverless clusters.
+
+**Parameters:** None
 
 ### Cluster Management
 
@@ -99,7 +146,7 @@ Lists all TiDB Cloud Serverless clusters in your organization.
 
 #### `tidbcloud_get_cluster`
 
-Gets detailed information about a specific cluster.
+Gets detailed information about a specific cluster, including connection endpoint (host and port).
 
 **Parameters:**
 - `cluster` (required): The cluster name or ID
@@ -110,7 +157,7 @@ Creates a new TiDB Cloud Serverless cluster. This is an async operation - the cl
 
 **Parameters:**
 - `displayName` (required): Display name for the cluster (max 64 chars)
-- `region` (required): Cloud region (e.g., 'us-east-1', 'eu-west-1')
+- `region` (required): Cloud region name (use `tidbcloud_list_regions` to get valid values)
 - `rootPassword` (optional): Root password. Auto-generated if not provided
 - `spendingLimitMonthly` (optional): Monthly spending limit in USD
 - `labels` (optional): Key-value labels for the cluster
@@ -145,7 +192,7 @@ Lists all branches for a cluster.
 
 #### `tidbcloud_get_branch`
 
-Gets detailed information about a specific branch. Useful for checking if a branch has finished creating.
+Gets detailed information about a specific branch, including connection endpoint. Useful for checking if a branch has finished creating.
 
 **Parameters:**
 - `cluster` (required): The cluster name or ID
@@ -168,6 +215,74 @@ Deletes a branch. **Warning: This is irreversible!**
 **Parameters:**
 - `cluster` (required): The cluster name or ID
 - `branch` (required): The branch name or ID to delete
+
+### Database Operations
+
+Database tools require connection credentials. Set them via environment variables or pass them as parameters.
+
+#### `show_databases`
+
+Lists all databases in the TiDB Cloud cluster.
+
+**Parameters:**
+- `host` (optional): Database host override
+- `username` (optional): Username override
+- `password` (optional): Password override
+
+#### `show_tables`
+
+Lists all tables in a specified database.
+
+**Parameters:**
+- `database` (required): The database to list tables from
+- `host` (optional): Database host override
+- `username` (optional): Username override
+- `password` (optional): Password override
+
+#### `db_query`
+
+Executes a read-only SQL query. Only SELECT, SHOW, DESCRIBE, and EXPLAIN statements are allowed.
+
+**Parameters:**
+- `sql` (required): The read-only SQL query to execute
+- `database` (optional): Database to use for the query
+- `host` (optional): Database host override
+- `username` (optional): Username override
+- `password` (optional): Password override
+
+#### `db_execute`
+
+Executes SQL statements that modify data or schema (INSERT, UPDATE, DELETE, CREATE, ALTER, DROP). **Warning: This can modify or delete data.**
+
+**Parameters:**
+- `sql` (required): SQL statement or array of statements to execute
+- `database` (optional): Database to use
+- `host` (optional): Database host override
+- `username` (optional): Username override
+- `password` (optional): Password override
+
+#### `db_create_user`
+
+Creates a new database user.
+
+**Parameters:**
+- `username` (required): Username for the new user
+- `password` (required): Password for the new user
+- `userHost` (optional): Host restriction (default: '%' for any host)
+- `host` (optional): Admin database host override
+- `adminUsername` (optional): Admin username override
+- `adminPassword` (optional): Admin password override
+
+#### `db_remove_user`
+
+Removes a database user. **Warning: This is irreversible!**
+
+**Parameters:**
+- `username` (required): Username of the user to remove
+- `userHost` (optional): Host specification (default: '%')
+- `host` (optional): Admin database host override
+- `adminUsername` (optional): Admin username override
+- `adminPassword` (optional): Admin password override
 
 ## Async Operations
 
@@ -206,22 +321,33 @@ mcp-server-tidbcloud/
 │   │   │   ├── api/
 │   │   │   │   ├── client.ts      # TiDB Cloud API client
 │   │   │   │   └── types.ts       # Type definitions
+│   │   │   ├── db/
+│   │   │   │   ├── client.ts      # Database client
+│   │   │   │   └── types.ts       # Database types
 │   │   │   └── tools/
 │   │   │       ├── index.ts       # Tool exports
 │   │   │       ├── cluster.ts     # Cluster management tools
-│   │   │       └── branch.ts      # Branch management tools
+│   │   │       ├── branch.ts      # Branch management tools
+│   │   │       ├── database.ts    # Database SQL tools
+│   │   │       └── region.ts      # Region discovery tools
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
 │   └── remote/                    # Remote MCP Server (HTTP transport)
+│       ├── api/                   # Vercel serverless functions
+│       │   ├── mcp.ts             # MCP endpoint with Bearer auth
+│       │   ├── oauth-callback.ts  # OAuth callback handler
+│       │   ├── register.ts        # Dynamic client registration
+│       │   └── token.ts           # Token endpoint
 │       ├── src/
-│       │   ├── index.ts           # Entry point
-│       │   ├── app.ts             # Hono web app
+│       │   ├── app.ts             # Hono web app with OAuth routes
 │       │   ├── config.ts          # Configuration with OAuth support
 │       │   ├── landing.ts         # Landing page
-│       │   └── middleware/        # Security middleware
+│       │   ├── oauth-state.ts     # OAuth state management
+│       │   ├── middleware/        # Security middleware
+│       │   └── store/             # Redis storage for OAuth
 │       ├── package.json
-│       └── tsconfig.json
+│       └── vercel.json            # Vercel routing configuration
 │
 ├── package.json                   # Root workspace config
 ├── pnpm-workspace.yaml
@@ -231,7 +357,7 @@ mcp-server-tidbcloud/
 ## TiDB Cloud Limitations
 
 ### Cluster Limitations
-- Serverless clusters are available in select regions
+- Serverless clusters are available in select regions (use `tidbcloud_list_regions` to see available regions)
 - Spending limits can be configured to control costs
 
 ### Branch Limitations
@@ -249,7 +375,7 @@ This MCP server grants powerful database management capabilities. Please review 
 
 - **Always review actions**: Review and authorize actions requested by the LLM before execution
 - **Development use**: This server is intended for local development and IDE integrations
-- **Production environments**: Not recommended for production without proper OAuth setup
+- **Production environments**: The remote server uses OAuth 2.1 with PKCE for secure authentication
 - **Access control**: Ensure only authorized users have access to your MCP server URL
 - **API key security**: Never expose your API keys in client-side code or public repositories
 - **Audit access**: Monitor usage and regularly audit who has access to your API keys

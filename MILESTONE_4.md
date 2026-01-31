@@ -155,99 +155,71 @@ Consider adding tools for:
 
 ### 3.4 Per-User Database Configuration (UX Improvement)
 
-**Status:** Not implemented
+**Status:** ✅ Complete
 
-**Problem:** Currently, database credentials (`TIDB_CLOUD_DB_HOST`, `TIDB_CLOUD_DB_USER`, `TIDB_CLOUD_DB_PASSWORD`) are hardcoded in environment variables. However, each user connecting via OAuth has their own clusters and databases. This creates a poor UX where:
-- All users share the same database connection
-- Users cannot connect to their own clusters
-- Manual credential entry is required for each SQL tool call
+**Solution:** The remote server reads database credentials from custom HTTP headers. Users configure credentials locally in Claude Desktop config, and `mcp-remote` forwards them as headers with each request.
 
-**Comparison with Neon:** The Neon MCP server doesn't require explicit database credentials because their Management API provides a `get_connection_string` endpoint that returns full connection details. TiDB Cloud's Management API does not expose database credentials, requiring a different approach.
+**API Capabilities:** The TiDB Cloud Management API provides connection endpoints (host and port) via the `ClusterEndpoints` response. The existing `tidbcloud_get_cluster` and `tidbcloud_list_clusters` tools already display this information. The API does **not** expose database credentials (username/password).
 
-#### Solution A: Connection Profile Tool
+| Available via API | Not Available via API |
+|-------------------|----------------------|
+| Host (endpoint)   | Username             |
+| Port              | Password             |
+| Region info       |                      |
+| userPrefix        |                      |
 
-Add a `set_database_connection` tool that stores connection details in the user's session:
+#### How It Works
 
-```typescript
-// New tool: set_database_connection
-{
-  name: "set_database_connection",
-  description: "Store database connection details for subsequent SQL operations",
-  parameters: {
-    host: { type: "string", required: true },
-    username: { type: "string", required: true },
-    password: { type: "string", required: true },
-    database: { type: "string", required: false }
-  }
-}
-```
-
-**Implementation:**
-- Store connection in Redis: `db:connection:{user_token_hash}` with session TTL (e.g., 1 hour)
-- Encrypt password before storage
-- SQL tools (`db_query`, `db_execute`, etc.) check Redis for stored connection before falling back to env vars
-- Add `clear_database_connection` tool to remove stored credentials
+1. User asks to connect to a cluster
+2. Claude uses `tidbcloud_get_cluster` to retrieve host/port from the API
+3. Claude provides Claude Desktop config example with the connection details pre-filled
+4. User updates their config and restarts Claude Desktop
+5. Future database operations work automatically (credentials sent via headers)
 
 **User Flow:**
 ```
-User: "Connect to my database at gateway01.us-east-1.prod.aws.tidbcloud.com"
-Claude: Uses set_database_connection tool
-User: Provides username and password when prompted
-Claude: "Connected! You can now run queries against your database."
-User: "Show me all tables"
-Claude: Uses db_query with stored connection (no re-prompting)
+User: "Connect to my prod-cluster"
+Claude: Uses tidbcloud_get_cluster to get endpoint info
+Claude: "Found prod-cluster! Here are the connection details:
+
+         Host: gateway01.us-east-1.prod.aws.tidbcloud.com
+         Port: 4000
+         Username format: 2abc123.root (where 2abc123 is your userPrefix)
+
+         To configure database access, update your claude_desktop_config.json:
+
+         {
+           "mcpServers": {
+             "TiDB Cloud": {
+               "command": "npx",
+               "args": [
+                 "-y", "mcp-remote",
+                 "https://mcp-server-tidbcloud-remote.vercel.app/mcp",
+                 "--header", "X-TiDB-DB-Host:${TIDB_CLOUD_DB_HOST}",
+                 "--header", "X-TiDB-DB-User:${TIDB_CLOUD_DB_USER}",
+                 "--header", "X-TiDB-DB-Password:${TIDB_CLOUD_DB_PASSWORD}"
+               ],
+               "env": {
+                 "TIDB_CLOUD_DB_HOST": "gateway01.us-east-1.prod.aws.tidbcloud.com",
+                 "TIDB_CLOUD_DB_USER": "<your-username>",
+                 "TIDB_CLOUD_DB_PASSWORD": "<your-password>"
+               }
+             }
+           }
+         }
+
+         Replace <your-username> and <your-password> with your credentials.
+         After updating, restart Claude Desktop."
 ```
 
-#### Solution B: Cluster Selection Tool
+#### Implementation Details
 
-Add a `select_cluster` tool that leverages the Management API to simplify connection:
-
-```typescript
-// New tool: select_cluster
-{
-  name: "select_cluster",
-  description: "List and select a cluster to connect to",
-  parameters: {
-    project_id: { type: "string", required: false },
-    cluster_id: { type: "string", required: false }
-  }
-}
-```
-
-**Implementation:**
-1. Use OAuth token to call Management API (`list_clusters`)
-2. Display available clusters to user
-3. When user selects a cluster, retrieve connection endpoint via API
-4. Prompt user for database password only (username can be derived or prompted)
-5. Store connection using Solution A's mechanism
-
-**User Flow:**
-```
-User: "Connect to my TiDB cluster"
-Claude: Uses select_cluster tool → "You have 3 clusters:
-  1. prod-cluster (us-east-1) - AVAILABLE
-  2. dev-cluster (us-west-2) - AVAILABLE  
-  3. test-cluster (eu-west-1) - MAINTENANCE
-  Which one would you like to use?"
-User: "Use prod-cluster"
-Claude: "Please provide the database password for prod-cluster"
-User: Provides password
-Claude: "Connected to prod-cluster! Ready for queries."
-```
-
-#### Recommended Approach
-
-Implement both solutions together:
-1. **`select_cluster`** - For discovery and easy cluster selection (leverages OAuth)
-2. **`set_database_connection`** - For direct connection or after cluster selection
-3. **`get_database_connection`** - Show current active connection (masked password)
-4. **`clear_database_connection`** - Disconnect / clear stored credentials
-
-This provides flexibility:
-- Power users can directly set connection details
-- New users can browse and select from their clusters
-- Credentials persist within session (no repeated prompts)
-- Secure storage with encryption and TTL
+- **Custom headers**: Remote server reads `X-TiDB-DB-Host`, `X-TiDB-DB-User`, `X-TiDB-DB-Password` from request headers
+- **mcp-remote forwarding**: The `--header` flag with `${VAR}` syntax forwards local env vars as headers
+- **No server-side storage**: Credentials are sent per-request, never stored on the server
+- **Fallback to tool parameters**: If headers not set, users can still pass credentials as tool parameters
+- **Auto-discovery**: Host and port are retrieved via `tidbcloud_get_cluster` / `tidbcloud_get_branch`
+- **userPrefix hint**: Username format can be suggested using cluster's `userPrefix` field (e.g., `{userPrefix}.root`)
 
 ## Priority 4: Developer Experience
 
@@ -284,8 +256,7 @@ This provides flexibility:
 | P2 | Structured Logging | 1-2 hours | Not started |
 | P3 | Token Revocation | 2-3 hours | Not started |
 | P3 | Additional Tools | 4-8 hours each | Not started |
-| P3 | Per-User DB Config (Connection Profile) | 3-4 hours | Not started |
-| P3 | Per-User DB Config (Cluster Selection) | 4-6 hours | Not started |
+| P3 | Per-User DB Config (env var guidance) | N/A | ✅ No new tools needed |
 | P4 | Integration Tests | 4-6 hours | Not started |
 
 ## Architecture Notes

@@ -60,27 +60,41 @@ function createClient(accessToken: string): TiDBCloudClient {
   return new TiDBCloudClient(config);
 }
 
-function getDatabaseConfig() {
-  if (!process.env.TIDB_CLOUD_DB_HOST) return undefined;
+/**
+ * Extract database configuration from request headers.
+ * Users can pass credentials via mcp-remote --header flags:
+ *   --header "X-TiDB-DB-Host:${TIDB_CLOUD_DB_HOST}"
+ *   --header "X-TiDB-DB-User:${TIDB_CLOUD_DB_USER}"
+ *   --header "X-TiDB-DB-Password:${TIDB_CLOUD_DB_PASSWORD}"
+ */
+function getDatabaseConfigFromHeaders(req: VercelRequest) {
+  const host = req.headers["x-tidb-db-host"];
+  const username = req.headers["x-tidb-db-user"];
+  const password = req.headers["x-tidb-db-password"];
+
+  // All three are required for a valid database config
+  if (!host || !username || !password) return undefined;
+
   return {
-    host: process.env.TIDB_CLOUD_DB_HOST,
-    username: process.env.TIDB_CLOUD_DB_USER || "",
-    password: process.env.TIDB_CLOUD_DB_PASSWORD || "",
-    database: process.env.TIDB_CLOUD_DB_NAME,
+    host: Array.isArray(host) ? host[0] : host,
+    username: Array.isArray(username) ? username[0] : username,
+    password: Array.isArray(password) ? password[0] : password,
   };
 }
 
-function createServer(accessToken: string): McpServer {
+function createServer(accessToken: string, req: VercelRequest): McpServer {
   const server = new McpServer({
     name: "tidbcloud-mcp-server",
     version: "0.1.0",
   });
 
   const client = createClient(accessToken);
+  const dbConfig = getDatabaseConfigFromHeaders(req);
+
   registerRegionTools(server, client);
   registerClusterTools(server, client);
   registerBranchTools(server, client);
-  registerDatabaseTools(server, getDatabaseConfig());
+  registerDatabaseTools(server, dbConfig);
 
   return server;
 }
@@ -95,7 +109,7 @@ export default async function handler(
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, mcp-session-id",
+    "Content-Type, Authorization, mcp-session-id, X-TiDB-DB-Host, X-TiDB-DB-User, X-TiDB-DB-Password",
   );
 
   // Handle CORS preflight
@@ -138,7 +152,7 @@ export default async function handler(
   }
 
   try {
-    const server = createServer(accessToken);
+    const server = createServer(accessToken, req);
 
     // Create transport for this request (stateless - no session management)
     const transport = new StreamableHTTPServerTransport({
