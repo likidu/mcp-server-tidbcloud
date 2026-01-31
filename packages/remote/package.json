@@ -1,6 +1,6 @@
 {
   "name": "@likidu/mcp-server-tidbcloud-remote",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "description": "Hosted MCP server for TiDB Cloud on Vercel",
   "type": "module",
   "main": "dist/app.js",
