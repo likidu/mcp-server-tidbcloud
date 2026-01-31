@@ -12,6 +12,10 @@
       "destination": "/api/mcp"
     },
     {
+      "source": "/",
+      "destination": "/api"
+    },
+    {
       "source": "/:path*",
       "destination": "/api?path=:path*"
     }
