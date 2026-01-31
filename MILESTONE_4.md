@@ -155,10 +155,9 @@ Consider adding tools for:
 
 ### 3.4 Per-User Database Configuration (UX Improvement)
 
-**Solution:** The remote server does not store any database credentials server-side. Instead:
-- Host/port are auto-discovered via the Management API
-- Users configure credentials locally (Claude Desktop config or terminal environment variables)
-- Credentials are passed as tool parameters for each database operation
+**Status:** ✅ Complete
+
+**Solution:** The remote server reads database credentials from custom HTTP headers. Users configure credentials locally in Claude Desktop config, and `mcp-remote` forwards them as headers with each request.
 
 **API Capabilities:** The TiDB Cloud Management API provides connection endpoints (host and port) via the `ClusterEndpoints` response. The existing `tidbcloud_get_cluster` and `tidbcloud_list_clusters` tools already display this information. The API does **not** expose database credentials (username/password).
 
@@ -173,9 +172,9 @@ Consider adding tools for:
 
 1. User asks to connect to a cluster
 2. Claude uses `tidbcloud_get_cluster` to retrieve host/port from the API
-3. Claude asks user how they want to configure credentials (Claude Desktop config or terminal)
-4. Based on user's choice, Claude provides the appropriate setup instructions
-5. For each database operation, credentials are passed as tool parameters
+3. Claude provides Claude Desktop config example with the connection details pre-filled
+4. User updates their config and restarts Claude Desktop
+5. Future database operations work automatically (credentials sent via headers)
 
 **User Flow:**
 ```
@@ -187,18 +186,19 @@ Claude: "Found prod-cluster! Here are the connection details:
          Port: 4000
          Username format: 2abc123.root (where 2abc123 is your userPrefix)
 
-         How would you like to configure the database credentials?
-         1. Update Claude Desktop config (recommended for persistent setup)
-         2. Set environment variables in terminal (for temporary/dev use)"
-
-User: "1"
-Claude: "Add these to your claude_desktop_config.json and restart Claude Desktop:
+         To configure database access, update your claude_desktop_config.json:
 
          {
            "mcpServers": {
              "TiDB Cloud": {
                "command": "npx",
-               "args": ["-y", "mcp-remote", "https://mcp-server-tidbcloud-remote.vercel.app/mcp"],
+               "args": [
+                 "-y", "mcp-remote",
+                 "https://mcp-server-tidbcloud-remote.vercel.app/mcp",
+                 "--header", "X-TiDB-DB-Host:${TIDB_CLOUD_DB_HOST}",
+                 "--header", "X-TiDB-DB-User:${TIDB_CLOUD_DB_USER}",
+                 "--header", "X-TiDB-DB-Password:${TIDB_CLOUD_DB_PASSWORD}"
+               ],
                "env": {
                  "TIDB_CLOUD_DB_HOST": "gateway01.us-east-1.prod.aws.tidbcloud.com",
                  "TIDB_CLOUD_DB_USER": "<your-username>",
@@ -208,44 +208,18 @@ Claude: "Add these to your claude_desktop_config.json and restart Claude Desktop
            }
          }
 
-         Replace <your-username> and <your-password> with your credentials."
-```
-
-**Alternative: Terminal Setup**
-```
-User: "2"
-Claude: "Run these commands in your terminal before starting Claude:
-
-         export TIDB_CLOUD_DB_HOST='gateway01.us-east-1.prod.aws.tidbcloud.com'
-         export TIDB_CLOUD_DB_USER='<your-username>'
-         export TIDB_CLOUD_DB_PASSWORD='<your-password>'
-
          Replace <your-username> and <your-password> with your credentials.
-         Note: These variables will only persist for the current terminal session."
-```
-
-**Branch Connection:**
-```
-User: "Connect to dev-branch on prod-cluster"
-Claude: Uses tidbcloud_get_branch to get branch endpoint
-Claude: "Found dev-branch! Here are the connection details:
-
-         Host: gateway01.us-east-1.prod.aws.tidbcloud.com
-         Port: 4001
-         Username format: 2abc123.root (where 2abc123 is your userPrefix)
-
-         How would you like to configure the database credentials?
-         1. Update Claude Desktop config (recommended for persistent setup)
-         2. Set environment variables in terminal (for temporary/dev use)"
+         After updating, restart Claude Desktop."
 ```
 
 #### Implementation Details
 
-- **No server-side credential storage**: Remote server does not read or store `TIDB_CLOUD_DB_*` environment variables
-- **Database tools** (`show_databases`, `db_query`, `db_execute`, etc.) accept `host`, `username`, `password` parameter overrides
+- **Custom headers**: Remote server reads `X-TiDB-DB-Host`, `X-TiDB-DB-User`, `X-TiDB-DB-Password` from request headers
+- **mcp-remote forwarding**: The `--header` flag with `${VAR}` syntax forwards local env vars as headers
+- **No server-side storage**: Credentials are sent per-request, never stored on the server
+- **Fallback to tool parameters**: If headers not set, users can still pass credentials as tool parameters
 - **Auto-discovery**: Host and port are retrieved via `tidbcloud_get_cluster` / `tidbcloud_get_branch`
 - **userPrefix hint**: Username format can be suggested using cluster's `userPrefix` field (e.g., `{userPrefix}.root`)
-- **Secure by design**: Credentials stay on user's machine, never transmitted to or stored on the server
 
 ## Priority 4: Developer Experience
 

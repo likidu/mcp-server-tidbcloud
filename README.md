@@ -41,7 +41,7 @@ There are two ways to use this MCP server with Claude Desktop:
 
 Connect to the hosted MCP server using `mcp-remote`. No local setup or API keys needed - you'll authenticate with your TiDB Cloud account via OAuth.
 
-Add the following to your Claude Desktop configuration file (`claude_desktop_config.json`):
+**Basic Configuration:**
 
 ```json
 {
@@ -55,6 +55,34 @@ Add the following to your Claude Desktop configuration file (`claude_desktop_con
 ```
 
 When you first use the server, you'll be prompted to authenticate with your TiDB Cloud account.
+
+**With Database Credentials (for SQL operations):**
+
+To use database tools (`show_databases`, `db_query`, `db_execute`, etc.), configure your database credentials. The credentials are stored locally and sent via custom headers:
+
+```json
+{
+  "mcpServers": {
+    "TiDB Cloud": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "https://mcp-server-tidbcloud-remote.vercel.app/mcp",
+        "--header", "X-TiDB-DB-Host:${TIDB_CLOUD_DB_HOST}",
+        "--header", "X-TiDB-DB-User:${TIDB_CLOUD_DB_USER}",
+        "--header", "X-TiDB-DB-Password:${TIDB_CLOUD_DB_PASSWORD}"
+      ],
+      "env": {
+        "TIDB_CLOUD_DB_HOST": "gateway01.us-east-1.prod.aws.tidbcloud.com",
+        "TIDB_CLOUD_DB_USER": "your-username",
+        "TIDB_CLOUD_DB_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
+To get your cluster's host, use the `tidbcloud_get_cluster` tool - it will display the connection endpoint. Your username format is typically `{userPrefix}.root` where `userPrefix` is shown in the cluster details.
 
 ### Option 2: Local Server (stdio)
 
