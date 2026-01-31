@@ -24,12 +24,6 @@ if (config.authMode) {
   console.log("Authentication: Not configured");
 }
 
-if (config.database?.host) {
-  console.log("Database connection: Configured");
-} else {
-  console.log("Database connection: Not configured");
-}
-
 console.log("");
 console.log("Endpoints:");
 console.log(`  Landing: http://${config.server.host}:${config.server.port}/`);

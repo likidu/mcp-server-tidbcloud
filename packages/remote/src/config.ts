@@ -8,13 +8,6 @@ export interface ServerConfig {
   serverHost: string;
 }
 
-export interface DatabaseConfig {
-  host: string;
-  username: string;
-  password: string;
-  database?: string;
-}
-
 /**
  * Environment for TiDB Cloud API endpoints
  * - dev: Uses dev.tidbcloud.com and serverless.dev.tidbapi.com
@@ -40,7 +33,6 @@ export interface Config {
     privateKey: string;
   };
   apiBaseUrl?: string;
-  database?: DatabaseConfig;
 }
 
 /**
@@ -150,14 +142,6 @@ export function loadConfig(): Config {
         }
       : undefined,
     apiBaseUrl,
-    database: process.env.TIDB_CLOUD_DB_HOST
-      ? {
-          host: process.env.TIDB_CLOUD_DB_HOST,
-          username: process.env.TIDB_CLOUD_DB_USER || "",
-          password: process.env.TIDB_CLOUD_DB_PASSWORD || "",
-          database: process.env.TIDB_CLOUD_DB_NAME,
-        }
-      : undefined,
   };
 }
 
@@ -200,12 +184,6 @@ export function validateConfig(config: Config): void {
       "No authentication configured. Set either:\n" +
         "    - OAuth: TIDB_CLOUD_OAUTH_CLIENT_ID and TIDB_CLOUD_OAUTH_CLIENT_SECRET\n" +
         "    - API Key: TIDB_CLOUD_PUBLIC_KEY and TIDB_CLOUD_PRIVATE_KEY",
-    );
-  }
-
-  if (!config.database) {
-    warnings.push(
-      "Database connection not configured. SQL execution tools will require connection parameters.",
     );
   }
 

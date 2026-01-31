@@ -60,16 +60,6 @@ function createClient(accessToken: string): TiDBCloudClient {
   return new TiDBCloudClient(config);
 }
 
-function getDatabaseConfig() {
-  if (!process.env.TIDB_CLOUD_DB_HOST) return undefined;
-  return {
-    host: process.env.TIDB_CLOUD_DB_HOST,
-    username: process.env.TIDB_CLOUD_DB_USER || "",
-    password: process.env.TIDB_CLOUD_DB_PASSWORD || "",
-    database: process.env.TIDB_CLOUD_DB_NAME,
-  };
-}
-
 function createServer(accessToken: string): McpServer {
   const server = new McpServer({
     name: "tidbcloud-mcp-server",
@@ -80,7 +70,7 @@ function createServer(accessToken: string): McpServer {
   registerRegionTools(server, client);
   registerClusterTools(server, client);
   registerBranchTools(server, client);
-  registerDatabaseTools(server, getDatabaseConfig());
+  registerDatabaseTools(server, undefined);
 
   return server;
 }
