@@ -371,6 +371,16 @@ export function getLandingPageHtml(baseUrl: string): string {
             <p>Add this server URL to your MCP-compatible client (like Claude Desktop) to start managing your TiDB Cloud resources with natural language.</p>
         </div>
 
+        <div class="info-box">
+            <h3>Database Operations</h3>
+            <p>To run SQL queries and manage database users, you need to provide database credentials. You have two options:</p>
+            <ul style="margin-top: 0.75rem; margin-left: 1.25rem; color: var(--text-secondary); font-size: 0.9rem;">
+                <li style="margin-bottom: 0.5rem;"><strong>Option 1:</strong> Provide credentials (host, username, password) directly in the chat when prompted</li>
+                <li><strong>Option 2 (Recommended):</strong> Configure credentials in your Claude Desktop config using <code style="background: var(--darker-bg); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem;">--header</code> flags with mcp-remote. Credentials stay local and are never stored on the server.</li>
+            </ul>
+            <p style="margin-top: 0.75rem;">Ask the assistant to "connect to [cluster-name]" and it will guide you through the setup.</p>
+        </div>
+
         <div class="security-warning">
             <h3>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -385,7 +395,6 @@ export function getLandingPageHtml(baseUrl: string): string {
                 <li>Intended for local development and IDE integrations</li>
                 <li>Not recommended for production environments without proper OAuth setup</li>
                 <li>Ensure only authorized users have access to your MCP server URL</li>
-                <li>Monitor usage and regularly audit access to your API keys</li>
             </ul>
             <p style="margin-top: 0.75rem; margin-bottom: 0;"><a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices" target="_blank">Read MCP Security Best Practices →</a></p>
         </div>
