@@ -4,7 +4,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { authorizationCodes } from "../dist/oauth-state.js";
+import { decodeAuthCode } from "../dist/oauth-state.js";
 import { loadConfig, type Environment } from "../dist/config.js";
 
 const config = loadConfig();
@@ -86,27 +86,44 @@ export default async function handler(
 
     // Handle authorization_code grant
     if (grantType === "authorization_code") {
-      const { code, redirect_uri: redirectUri, code_verifier: codeVerifier } = body;
+      const {
+        code,
+        redirect_uri: redirectUri,
+        code_verifier: codeVerifier,
+      } = body;
 
       if (!code) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: "invalid_request", error_description: "Missing code" }));
+        res.end(
+          JSON.stringify({
+            error: "invalid_request",
+            error_description: "Missing code",
+          }),
+        );
         return;
       }
 
-      const codeData = authorizationCodes.get(code);
+      // Decode the authorization code (contains token data encoded as base64url JSON)
+      const codeData = decodeAuthCode(code);
       if (!codeData) {
         res.statusCode = 400;
-        res.end(JSON.stringify({
-          error: "invalid_grant",
-          error_description: "Invalid or expired authorization code",
-        }));
+        res.end(
+          JSON.stringify({
+            error: "invalid_grant",
+            error_description: "Invalid or expired authorization code",
+          }),
+        );
         return;
       }
 
       if (redirectUri && redirectUri !== codeData.redirectUri) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: "invalid_grant", error_description: "redirect_uri mismatch" }));
+        res.end(
+          JSON.stringify({
+            error: "invalid_grant",
+            error_description: "redirect_uri mismatch",
+          }),
+        );
         return;
       }
 
@@ -114,10 +131,12 @@ export default async function handler(
       if (codeData.codeChallenge) {
         if (!codeVerifier) {
           res.statusCode = 400;
-          res.end(JSON.stringify({
-            error: "invalid_request",
-            error_description: "code_verifier required",
-          }));
+          res.end(
+            JSON.stringify({
+              error: "invalid_request",
+              error_description: "code_verifier required",
+            }),
+          );
           return;
         }
 
@@ -130,23 +149,28 @@ export default async function handler(
 
         if (computedChallenge !== codeData.codeChallenge) {
           res.statusCode = 400;
-          res.end(JSON.stringify({
-            error: "invalid_grant",
-            error_description: "code_verifier mismatch",
-          }));
+          res.end(
+            JSON.stringify({
+              error: "invalid_grant",
+              error_description: "code_verifier mismatch",
+            }),
+          );
           return;
         }
       }
 
-      authorizationCodes.delete(code);
+      // Note: With encoded auth codes, we can't prevent replay attacks
+      // In production, use a database to track used codes
 
       res.statusCode = 200;
-      res.end(JSON.stringify({
-        access_token: codeData.accessToken,
-        token_type: "Bearer",
-        expires_in: codeData.expiresIn,
-        refresh_token: codeData.refreshToken,
-      }));
+      res.end(
+        JSON.stringify({
+          access_token: codeData.accessToken,
+          token_type: "Bearer",
+          expires_in: codeData.expiresIn,
+          refresh_token: codeData.refreshToken,
+        }),
+      );
       return;
     }
 
@@ -156,10 +180,12 @@ export default async function handler(
 
       if (!refreshToken) {
         res.statusCode = 400;
-        res.end(JSON.stringify({
-          error: "invalid_request",
-          error_description: "Missing refresh_token",
-        }));
+        res.end(
+          JSON.stringify({
+            error: "invalid_request",
+            error_description: "Missing refresh_token",
+          }),
+        );
         return;
       }
 
@@ -168,7 +194,12 @@ export default async function handler(
 
       if (!serverClientId || !serverClientSecret) {
         res.statusCode = 500;
-        res.end(JSON.stringify({ error: "server_error", error_description: "OAuth not configured" }));
+        res.end(
+          JSON.stringify({
+            error: "server_error",
+            error_description: "OAuth not configured",
+          }),
+        );
         return;
       }
 
@@ -186,12 +217,17 @@ export default async function handler(
         });
 
         if (!tokenResponse.ok) {
-          console.error("TiDB Cloud token refresh failed:", await tokenResponse.text());
+          console.error(
+            "TiDB Cloud token refresh failed:",
+            await tokenResponse.text(),
+          );
           res.statusCode = 400;
-          res.end(JSON.stringify({
-            error: "invalid_grant",
-            error_description: "Failed to refresh token",
-          }));
+          res.end(
+            JSON.stringify({
+              error: "invalid_grant",
+              error_description: "Failed to refresh token",
+            }),
+          );
           return;
         }
 
@@ -203,32 +239,44 @@ export default async function handler(
         };
 
         res.statusCode = 200;
-        res.end(JSON.stringify({
-          access_token: tokenData.access_token,
-          token_type: "Bearer",
-          expires_in: tokenData.expires_in,
-          refresh_token: tokenData.refresh_token || refreshToken,
-        }));
+        res.end(
+          JSON.stringify({
+            access_token: tokenData.access_token,
+            token_type: "Bearer",
+            expires_in: tokenData.expires_in,
+            refresh_token: tokenData.refresh_token || refreshToken,
+          }),
+        );
         return;
       } catch (err) {
         console.error("Token refresh error:", err);
         res.statusCode = 500;
-        res.end(JSON.stringify({ error: "server_error", error_description: "Failed to refresh token" }));
+        res.end(
+          JSON.stringify({
+            error: "server_error",
+            error_description: "Failed to refresh token",
+          }),
+        );
         return;
       }
     }
 
     // Unsupported grant type
     res.statusCode = 400;
-    res.end(JSON.stringify({
-      error: "unsupported_grant_type",
-      error_description: `Grant type '${grantType}' not supported`,
-    }));
+    res.end(
+      JSON.stringify({
+        error: "unsupported_grant_type",
+        error_description: `Grant type '${grantType}' not supported`,
+      }),
+    );
   } catch (err) {
     res.statusCode = 400;
-    res.end(JSON.stringify({
-      error: "invalid_request",
-      error_description: err instanceof Error ? err.message : "Invalid request",
-    }));
+    res.end(
+      JSON.stringify({
+        error: "invalid_request",
+        error_description:
+          err instanceof Error ? err.message : "Invalid request",
+      }),
+    );
   }
 }

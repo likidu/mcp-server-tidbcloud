@@ -69,14 +69,12 @@ const OAUTH_SCOPE = "org:owner";
 // ============================================================
 
 import {
-  authorizationStates,
-  authorizationCodes,
-  cleanupExpiredStates,
+  type AuthorizationState,
   generateRandomString,
+  encodeState,
+  decodeState,
+  encodeAuthCode,
 } from "./oauth-state.js";
-
-// Re-export for use by other modules
-export { authorizationStates, authorizationCodes };
 
 // ============================================================
 // Hono App Setup
@@ -252,16 +250,16 @@ app.get("/api/authorize", (c) => {
     );
   }
 
-  const internalState = generateRandomString(32);
-  authorizationStates.set(internalState, {
+  // Encode all state data in the state parameter (serverless-safe)
+  const stateData: AuthorizationState = {
     redirectUri,
     codeChallenge,
     codeChallengeMethod,
     clientId: clientId || "unknown",
+    clientState: state, // Preserve the original client state
     createdAt: Date.now(),
-  });
-
-  cleanupExpiredStates();
+  };
+  const encodedState = encodeState(stateData);
 
   const host = c.req.header("host") || config.server.serverHost;
   const scheme = c.req.header("x-forwarded-proto") || "https";
@@ -275,352 +273,36 @@ app.get("/api/authorize", (c) => {
   tidbAuthUrl.searchParams.set("redirect_uri", ourCallbackUri);
   tidbAuthUrl.searchParams.set("scope", OAUTH_SCOPE);
   tidbAuthUrl.searchParams.set("response_type", "code");
-  tidbAuthUrl.searchParams.set(
-    "state",
-    state ? `${internalState}:${state}` : internalState,
-  );
+  tidbAuthUrl.searchParams.set("state", encodedState);
 
   return c.redirect(tidbAuthUrl.toString());
 });
 
-// ============================================================
-// OAuth Callback (receives code from TiDB Cloud)
-// ============================================================
-
-app.get("/api/callback", async (c) => {
-  const code = c.req.query("code");
-  const stateParam = c.req.query("state");
-  const error = c.req.query("error");
-  const errorDescription = c.req.query("error_description");
-
-  if (error) {
-    const internalState = stateParam?.split(":")[0];
-    const stateData = internalState
-      ? authorizationStates.get(internalState)
-      : null;
-
-    if (stateData) {
-      const redirectUrl = new URL(stateData.redirectUri);
-      redirectUrl.searchParams.set("error", error);
-      if (errorDescription) {
-        redirectUrl.searchParams.set("error_description", errorDescription);
-      }
-      authorizationStates.delete(internalState!);
-      return c.redirect(redirectUrl.toString());
-    }
-
-    return c.json({ error, error_description: errorDescription }, 400);
-  }
-
-  if (!code || !stateParam) {
-    return c.json(
-      { error: "invalid_request", error_description: "Missing code or state" },
-      400,
-    );
-  }
-
-  const [internalState, ...clientStateParts] = stateParam.split(":");
-  const clientState = clientStateParts.join(":");
-
-  const stateData = authorizationStates.get(internalState);
-  if (!stateData) {
-    return c.json(
-      {
-        error: "invalid_request",
-        error_description: "Invalid or expired state",
-      },
-      400,
-    );
-  }
-
-  const serverClientId = config.oauth?.clientId;
-  const serverClientSecret = config.oauth?.clientSecret;
-
-  if (!serverClientId || !serverClientSecret) {
-    return c.json(
-      { error: "server_error", error_description: "OAuth not configured" },
-      500,
-    );
-  }
-
-  const host = c.req.header("host") || config.server.serverHost;
-  const scheme = c.req.header("x-forwarded-proto") || "https";
-  const ourCallbackUri = `${scheme}://${host}/callback`;
-
-  try {
-    const tokenUrl = TIDB_OAUTH_ENDPOINTS[config.environment].token;
-    const tokenResponse = await fetch(tokenUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: serverClientId,
-        client_secret: serverClientSecret,
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: ourCallbackUri,
-      }),
-    });
-
-    if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      console.error("TiDB Cloud token exchange failed:", errorText);
-
-      const redirectUrl = new URL(stateData.redirectUri);
-      redirectUrl.searchParams.set("error", "server_error");
-      redirectUrl.searchParams.set(
-        "error_description",
-        "Failed to exchange token with TiDB Cloud",
-      );
-      authorizationStates.delete(internalState);
-      return c.redirect(redirectUrl.toString());
-    }
-
-    const tokenData = (await tokenResponse.json()) as {
-      access_token: string;
-      token_type: string;
-      expires_in: number;
-      refresh_token?: string;
-    };
-
-    const ourAuthCode = generateRandomString(32);
-    authorizationCodes.set(ourAuthCode, {
-      accessToken: tokenData.access_token,
-      refreshToken: tokenData.refresh_token,
-      expiresIn: tokenData.expires_in,
-      redirectUri: stateData.redirectUri,
-      codeChallenge: stateData.codeChallenge,
-      codeChallengeMethod: stateData.codeChallengeMethod,
-      createdAt: Date.now(),
-    });
-
-    authorizationStates.delete(internalState);
-
-    const redirectUrl = new URL(stateData.redirectUri);
-    redirectUrl.searchParams.set("code", ourAuthCode);
-    if (clientState) {
-      redirectUrl.searchParams.set("state", clientState);
-    }
-
-    return c.redirect(redirectUrl.toString());
-  } catch (err) {
-    console.error("OAuth callback error:", err);
-
-    const redirectUrl = new URL(stateData.redirectUri);
-    redirectUrl.searchParams.set("error", "server_error");
-    redirectUrl.searchParams.set(
-      "error_description",
-      err instanceof Error ? err.message : "Unknown error",
-    );
-    authorizationStates.delete(internalState);
-    return c.redirect(redirectUrl.toString());
-  }
-});
+// Note: /api/token is handled by a direct handler in api/token.ts
+// to avoid POST body stream issues with Hono in Vercel
 
 // ============================================================
-// Token Endpoint
+// OAuth Callback (registered with TiDB Cloud OAuth as /oauth/callback)
 // ============================================================
 
-app.post("/api/token", async (c) => {
-  const contentType = c.req.header("content-type") || "";
-  const body = contentType.includes("application/x-www-form-urlencoded")
-    ? ((await c.req.parseBody()) as Record<string, string>)
-    : ((await c.req.json()) as Record<string, string>);
-
-  const grantType = body.grant_type;
-
-  // Handle authorization_code grant
-  if (grantType === "authorization_code") {
-    const {
-      code,
-      redirect_uri: redirectUri,
-      code_verifier: codeVerifier,
-    } = body;
-
-    if (!code) {
-      return c.json(
-        { error: "invalid_request", error_description: "Missing code" },
-        400,
-      );
-    }
-
-    const codeData = authorizationCodes.get(code);
-    if (!codeData) {
-      return c.json(
-        {
-          error: "invalid_grant",
-          error_description: "Invalid or expired authorization code",
-        },
-        400,
-      );
-    }
-
-    if (redirectUri && redirectUri !== codeData.redirectUri) {
-      return c.json(
-        { error: "invalid_grant", error_description: "redirect_uri mismatch" },
-        400,
-      );
-    }
-
-    // Verify PKCE
-    if (codeData.codeChallenge) {
-      if (!codeVerifier) {
-        return c.json(
-          {
-            error: "invalid_request",
-            error_description: "code_verifier required",
-          },
-          400,
-        );
-      }
-
-      let computedChallenge: string;
-      if (codeData.codeChallengeMethod === "S256") {
-        const encoder = new TextEncoder();
-        const hashBuffer = await crypto.subtle.digest(
-          "SHA-256",
-          encoder.encode(codeVerifier),
-        );
-        computedChallenge = btoa(
-          String.fromCharCode(...new Uint8Array(hashBuffer)),
-        )
-          .replace(/\+/g, "-")
-          .replace(/\//g, "_")
-          .replace(/=+$/, "");
-      } else {
-        computedChallenge = codeVerifier;
-      }
-
-      if (computedChallenge !== codeData.codeChallenge) {
-        return c.json(
-          {
-            error: "invalid_grant",
-            error_description: "code_verifier mismatch",
-          },
-          400,
-        );
-      }
-    }
-
-    authorizationCodes.delete(code);
-
-    return c.json({
-      access_token: codeData.accessToken,
-      token_type: "Bearer",
-      expires_in: codeData.expiresIn,
-      refresh_token: codeData.refreshToken,
-    });
-  }
-
-  // Handle refresh_token grant
-  if (grantType === "refresh_token") {
-    const refreshToken = body.refresh_token;
-
-    if (!refreshToken) {
-      return c.json(
-        {
-          error: "invalid_request",
-          error_description: "Missing refresh_token",
-        },
-        400,
-      );
-    }
-
-    const serverClientId = config.oauth?.clientId;
-    const serverClientSecret = config.oauth?.clientSecret;
-
-    if (!serverClientId || !serverClientSecret) {
-      return c.json(
-        { error: "server_error", error_description: "OAuth not configured" },
-        500,
-      );
-    }
-
-    try {
-      const tokenUrl = TIDB_OAUTH_ENDPOINTS[config.environment].token;
-      const tokenResponse = await fetch(tokenUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_id: serverClientId,
-          client_secret: serverClientSecret,
-          grant_type: "refresh_token",
-          refresh_token: refreshToken,
-        }),
-      });
-
-      if (!tokenResponse.ok) {
-        console.error(
-          "TiDB Cloud token refresh failed:",
-          await tokenResponse.text(),
-        );
-        return c.json(
-          {
-            error: "invalid_grant",
-            error_description: "Failed to refresh token",
-          },
-          400,
-        );
-      }
-
-      const tokenData = (await tokenResponse.json()) as {
-        access_token: string;
-        token_type: string;
-        expires_in: number;
-        refresh_token?: string;
-      };
-
-      return c.json({
-        access_token: tokenData.access_token,
-        token_type: "Bearer",
-        expires_in: tokenData.expires_in,
-        refresh_token: tokenData.refresh_token || refreshToken,
-      });
-    } catch (err) {
-      console.error("Token refresh error:", err);
-      return c.json(
-        { error: "server_error", error_description: "Failed to refresh token" },
-        500,
-      );
-    }
-  }
-
-  // Unsupported grant type
-  return c.json(
-    {
-      error: "unsupported_grant_type",
-      error_description: `Grant type '${grantType}' not supported`,
-    },
-    400,
-  );
-});
-
-// ============================================================
-// Alias: /oauth/callback (for backward compatibility with registered OAuth app)
-// ============================================================
-
-// Also handle /oauth/callback directly (registered with TiDB Cloud OAuth)
 app.get("/oauth/callback", async (c) => {
   const code = c.req.query("code");
   const stateParam = c.req.query("state");
   const error = c.req.query("error");
   const errorDescription = c.req.query("error_description");
 
-  if (error) {
-    const internalState = stateParam?.split(":")[0];
-    const stateData = internalState
-      ? authorizationStates.get(internalState)
-      : null;
+  // Decode state from the state parameter (serverless-safe)
+  const stateData = stateParam ? decodeState(stateParam) : null;
 
+  if (error) {
     if (stateData) {
       const redirectUrl = new URL(stateData.redirectUri);
       redirectUrl.searchParams.set("error", error);
       if (errorDescription) {
         redirectUrl.searchParams.set("error_description", errorDescription);
       }
-      authorizationStates.delete(internalState!);
       return c.redirect(redirectUrl.toString());
     }
-
     return c.json({ error, error_description: errorDescription }, 400);
   }
 
@@ -631,10 +313,6 @@ app.get("/oauth/callback", async (c) => {
     );
   }
 
-  const [internalState, ...clientStateParts] = stateParam.split(":");
-  const clientState = clientStateParts.join(":");
-
-  const stateData = authorizationStates.get(internalState);
   if (!stateData) {
     return c.json(
       {
@@ -684,7 +362,6 @@ app.get("/oauth/callback", async (c) => {
         "error_description",
         "Failed to exchange token with TiDB Cloud",
       );
-      authorizationStates.delete(internalState);
       return c.redirect(redirectUrl.toString());
     }
 
@@ -695,8 +372,9 @@ app.get("/oauth/callback", async (c) => {
       refresh_token?: string;
     };
 
-    const ourAuthCode = generateRandomString(32);
-    authorizationCodes.set(ourAuthCode, {
+    // Encode the token data into the authorization code itself
+    // This makes it serverless-safe (no in-memory state needed)
+    const ourAuthCode = encodeAuthCode({
       accessToken: tokenData.access_token,
       refreshToken: tokenData.refresh_token,
       expiresIn: tokenData.expires_in,
@@ -706,12 +384,10 @@ app.get("/oauth/callback", async (c) => {
       createdAt: Date.now(),
     });
 
-    authorizationStates.delete(internalState);
-
     const redirectUrl = new URL(stateData.redirectUri);
     redirectUrl.searchParams.set("code", ourAuthCode);
-    if (clientState) {
-      redirectUrl.searchParams.set("state", clientState);
+    if (stateData.clientState) {
+      redirectUrl.searchParams.set("state", stateData.clientState);
     }
 
     return c.redirect(redirectUrl.toString());
@@ -724,7 +400,6 @@ app.get("/oauth/callback", async (c) => {
       "error_description",
       err instanceof Error ? err.message : "Unknown error",
     );
-    authorizationStates.delete(internalState);
     return c.redirect(redirectUrl.toString());
   }
 });
