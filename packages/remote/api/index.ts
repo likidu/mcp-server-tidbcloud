@@ -5,8 +5,8 @@
  * The standard hono/vercel adapter expects Web Fetch API Request objects,
  * but Vercel's Node.js runtime passes Node.js IncomingMessage objects.
  *
- * We restore the original URL path from the query parameter since Vercel
- * rewrites all paths to /api.
+ * We restore the original URL path from the x-original-path header since
+ * Vercel rewrites all paths to /api.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -19,16 +19,14 @@ export default async function handler(
   req: IncomingMessage,
   res: ServerResponse,
 ) {
-  // Restore original path from query parameter
-  // Vercel rewrites /:path* to /api?path=:path*
-  const url = new URL(req.url || "/", `http://${req.headers.host}`);
-  const originalPath = url.searchParams.get("path");
+  // Restore original path from header
+  // Vercel adds x-original-path header before rewriting to /api
+  const originalPath = req.headers["x-original-path"] as string | undefined;
 
-  if (originalPath) {
-    // Reconstruct the original URL
-    url.pathname = `/${originalPath}`;
-    url.searchParams.delete("path");
-    req.url = url.pathname + url.search;
+  if (originalPath && originalPath !== "/api") {
+    // Keep any existing query string from the original URL
+    const url = new URL(req.url || "/", `http://${req.headers.host}`);
+    req.url = originalPath + url.search;
   }
 
   return honoHandler(req, res);

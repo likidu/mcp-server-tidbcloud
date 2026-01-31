@@ -2,6 +2,17 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "cd ../.. && pnpm install && pnpm build",
   "framework": null,
+  "headers": [
+    {
+      "source": "/:path*",
+      "headers": [
+        {
+          "key": "x-original-path",
+          "value": "/:path*"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/mcp/:path*",
@@ -12,12 +23,8 @@
       "destination": "/api/mcp"
     },
     {
-      "source": "/",
+      "source": "/(.*)",
       "destination": "/api"
-    },
-    {
-      "source": "/:path*",
-      "destination": "/api?path=:path*"
     }
   ]
 }
