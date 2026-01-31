@@ -219,11 +219,36 @@ export function registerDatabaseTools(
 
 Executes SHOW DATABASES and returns the list of database names.
 
-**Database credentials required.** Before calling this tool, ask the user which option they prefer:
-1. Provide credentials in chat (pass as host, username, password parameters)
-2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+**IMPORTANT: Database credentials required.** You MUST ask the user to choose one of these options:
 
-If user chooses option 2, show them the claude_desktop_config.json example with mcp-remote --header flags.
+**Option 1: Provide credentials in this conversation**
+- Ask user for username and password
+- Pass as host, username, password parameters to this tool
+
+**Option 2: Configure in Claude Desktop (RECOMMENDED)**
+- Show user this claude_desktop_config.json example:
+  {
+    "mcpServers": {
+      "TiDB Cloud": {
+        "command": "npx",
+        "args": [
+          "-y", "mcp-remote",
+          "https://mcp-server-tidbcloud-remote.vercel.app/mcp",
+          "--header", "X-TiDB-DB-Host:\${TIDB_CLOUD_DB_HOST}",
+          "--header", "X-TiDB-DB-User:\${TIDB_CLOUD_DB_USER}",
+          "--header", "X-TiDB-DB-Password:\${TIDB_CLOUD_DB_PASSWORD}"
+        ],
+        "env": {
+          "TIDB_CLOUD_DB_HOST": "<host from tidbcloud_get_cluster>",
+          "TIDB_CLOUD_DB_USER": "<username>",
+          "TIDB_CLOUD_DB_PASSWORD": "<password>"
+        }
+      }
+    }
+  }
+- Credentials stay local, never stored on server
+- Works for all future sessions without re-entering
+
 Use tidbcloud_get_cluster to get the host and port for the cluster.
 
 Args:
@@ -283,9 +308,9 @@ Returns:
 
 Executes SHOW TABLES and returns the list of table names.
 
-**Database credentials required.** Before calling this tool, ask the user which option they prefer:
-1. Provide credentials in chat (pass as host, username, password parameters)
-2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+**IMPORTANT: Database credentials required.** You MUST ask the user to choose:
+1. Provide credentials in this conversation (ask for username/password)
+2. Configure in Claude Desktop config with --header flags (RECOMMENDED - show the config example)
 
 Args:
   - database (string, required): The database to list tables from
@@ -348,9 +373,9 @@ Returns:
 Only SELECT, SHOW, DESCRIBE, and EXPLAIN statements are allowed.
 Results are returned as a formatted markdown table.
 
-**Database credentials required.** Before calling this tool, ask the user which option they prefer:
-1. Provide credentials in chat (pass as host, username, password parameters)
-2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+**IMPORTANT: Database credentials required.** You MUST ask the user to choose:
+1. Provide credentials in this conversation (ask for username/password)
+2. Configure in Claude Desktop config with --header flags (RECOMMENDED - show the config example)
 
 Args:
   - sql (string, required): The read-only SQL query to execute
@@ -430,9 +455,9 @@ Can execute a single statement or multiple statements in sequence.
 
 **WARNING:** This tool can modify or delete data. Use with caution.
 
-**Database credentials required.** Before calling this tool, ask the user which option they prefer:
-1. Provide credentials in chat (pass as host, username, password parameters)
-2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+**IMPORTANT: Database credentials required.** You MUST ask the user to choose:
+1. Provide credentials in this conversation (ask for username/password)
+2. Configure in Claude Desktop config with --header flags (RECOMMENDED - show the config example)
 
 Args:
   - sql (string | string[], required): SQL statement(s) to execute
@@ -508,9 +533,9 @@ Returns:
 
 Creates a user with the specified username, password, and host restriction.
 
-**Admin credentials required.** Before calling this tool, ask the user which option they prefer:
-1. Provide credentials in chat (pass as host, adminUsername, adminPassword parameters)
-2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+**IMPORTANT: Admin credentials required.** You MUST ask the user to choose:
+1. Provide credentials in this conversation (ask for admin username/password)
+2. Configure in Claude Desktop config with --header flags (RECOMMENDED - show the config example)
 
 Args:
   - username (string, required): Username for the new user
@@ -580,9 +605,9 @@ Returns:
 
 **WARNING:** This action is irreversible. The user will be permanently deleted.
 
-**Admin credentials required.** Before calling this tool, ask the user which option they prefer:
-1. Provide credentials in chat (pass as host, adminUsername, adminPassword parameters)
-2. Configure in Claude Desktop config with --header flags (recommended for persistent setup, credentials stay local)
+**IMPORTANT: Admin credentials required.** You MUST ask the user to choose:
+1. Provide credentials in this conversation (ask for admin username/password)
+2. Configure in Claude Desktop config with --header flags (RECOMMENDED - show the config example)
 
 Args:
   - username (string, required): Username of the user to remove
