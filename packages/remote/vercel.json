@@ -20,6 +20,10 @@
       "destination": "/api/register"
     },
     {
+      "source": "/api/token",
+      "destination": "/api/token"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api"
     }
