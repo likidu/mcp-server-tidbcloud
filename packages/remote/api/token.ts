@@ -3,6 +3,8 @@
  * Directly handles POST /api/token without Hono to avoid body stream issues
  */
 
+/// <reference lib="dom" />
+
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { getStore } from "../dist/store/index.js";
 import { loadConfig, type Environment } from "../dist/config.js";
