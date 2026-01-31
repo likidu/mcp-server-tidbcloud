@@ -231,6 +231,116 @@ export function getLandingPageHtml(baseUrl: string): string {
             text-decoration: underline;
         }
 
+        /* Tabs */
+        .tabs-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .tabs-header {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.875rem 1.25rem;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn.active {
+            color: var(--primary-red);
+            border-bottom-color: var(--primary-red);
+            background: rgba(227, 12, 27, 0.05);
+        }
+
+        .tab-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 1.5rem;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .tab-content h4 {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            font-weight: 400;
+        }
+
+        .config-file {
+            display: inline-block;
+            background: var(--darker-bg);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: var(--primary-red);
+            margin-bottom: 1rem;
+        }
+
+        .code-block {
+            position: relative;
+            background: var(--darker-bg);
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+
+        .code-block pre {
+            margin: 0;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+        }
+
+        .code-block .copy-code-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.35rem 0.6rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .code-block .copy-code-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+        }
+
         /* Tools Section */
         .tools-section {
             margin-bottom: 3rem;
@@ -366,9 +476,101 @@ export function getLandingPageHtml(baseUrl: string): string {
             </div>
         </div>
 
-        <div class="info-box">
-            <h3>Quick Start</h3>
-            <p>Add this server URL to your MCP-compatible client (like Claude Desktop) to start managing your TiDB Cloud resources with natural language.</p>
+        <div class="tabs-container">
+            <div class="tabs-header">
+                <button class="tab-btn active" onclick="switchTab('claude')" data-tab="claude">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                    Claude Desktop
+                </button>
+                <button class="tab-btn" onclick="switchTab('cursor')" data-tab="cursor">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v16H4V4zm2 2v12h12V6H6zm2 2h8v2H8V8zm0 4h8v2H8v-2z"/></svg>
+                    Cursor
+                </button>
+                <button class="tab-btn" onclick="switchTab('vscode')" data-tab="vscode">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.583 2.005L9.29 9.574 4.75 6.008l-2.165.926v10.132l2.165.926 4.54-3.566 8.293 7.569L21.415 20V4.005l-3.832-2zM4.583 14.518V9.482l2.583 2.518-2.583 2.518zm13 3.093l-5.417-5.11 5.417-5.11v10.22z"/></svg>
+                    VS Code
+                </button>
+                <button class="tab-btn" onclick="switchTab('windsurf')" data-tab="windsurf">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                    Windsurf
+                </button>
+            </div>
+
+            <div id="tab-claude" class="tab-content active">
+                <h4>Add the configuration to:</h4>
+                <span class="config-file">claude_desktop_config.json</span>
+                <div class="code-block">
+                    <button class="copy-code-btn" onclick="copyCode('claude-config')">Copy</button>
+                    <pre id="claude-config">{
+  "mcpServers": {
+    "TiDB Cloud": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "${mcpUrl}"
+      ]
+    }
+  }
+}</pre>
+                </div>
+            </div>
+
+            <div id="tab-cursor" class="tab-content">
+                <h4>Add the configuration to:</h4>
+                <span class="config-file">.cursor/mcp.json</span>
+                <div class="code-block">
+                    <button class="copy-code-btn" onclick="copyCode('cursor-config')">Copy</button>
+                    <pre id="cursor-config">{
+  "mcpServers": {
+    "TiDB Cloud": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "${mcpUrl}"
+      ]
+    }
+  }
+}</pre>
+                </div>
+            </div>
+
+            <div id="tab-vscode" class="tab-content">
+                <h4>Add the configuration to:</h4>
+                <span class="config-file">settings.json</span>
+                <div class="code-block">
+                    <button class="copy-code-btn" onclick="copyCode('vscode-config')">Copy</button>
+                    <pre id="vscode-config">{
+  "mcp.servers": {
+    "TiDB Cloud": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "${mcpUrl}"
+      ]
+    }
+  }
+}</pre>
+                </div>
+            </div>
+
+            <div id="tab-windsurf" class="tab-content">
+                <h4>Add the configuration to:</h4>
+                <span class="config-file">~/.codeium/windsurf/mcp_config.json</span>
+                <div class="code-block">
+                    <button class="copy-code-btn" onclick="copyCode('windsurf-config')">Copy</button>
+                    <pre id="windsurf-config">{
+  "mcpServers": {
+    "TiDB Cloud": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "${mcpUrl}"
+      ]
+    }
+  }
+}</pre>
+                </div>
+            </div>
         </div>
 
         <div class="info-box">
@@ -376,7 +578,7 @@ export function getLandingPageHtml(baseUrl: string): string {
             <p>To run SQL queries and manage database users, you need to provide database credentials. You have two options:</p>
             <ul style="margin-top: 0.75rem; margin-left: 1.25rem; color: var(--text-secondary); font-size: 0.9rem;">
                 <li style="margin-bottom: 0.5rem;"><strong>Option 1:</strong> Provide credentials (host, username, password) directly in the chat when prompted</li>
-                <li><strong>Option 2 (Recommended):</strong> Configure credentials in your Claude Desktop config using <code style="background: var(--darker-bg); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem;">--header</code> flags with mcp-remote. Credentials stay local and are never stored on the server.</li>
+                <li><strong>Option 2 (Recommended):</strong> Configure credentials in your config using <code style="background: var(--darker-bg); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem;">--header</code> flags with mcp-remote. Credentials stay local and are never stored on the server.</li>
             </ul>
             <p style="margin-top: 0.75rem;">Ask the assistant to "connect to [cluster-name]" and it will guide you through the setup.</p>
         </div>
@@ -501,6 +703,34 @@ export function getLandingPageHtml(baseUrl: string): string {
             const url = document.getElementById('mcpUrl').textContent;
             navigator.clipboard.writeText(url).then(() => {
                 const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.tab === tabName) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById('tab-' + tabName).classList.add('active');
+        }
+
+        function copyCode(elementId) {
+            const code = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = event.target;
                 const originalText = btn.textContent;
                 btn.textContent = 'Copied!';
                 setTimeout(() => {

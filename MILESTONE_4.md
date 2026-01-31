@@ -16,6 +16,7 @@ This document outlines the current status and future improvements for the TiDB C
 - ✅ **Security Middleware** - HTTPS enforcement, security headers, request ID tracking
 - ✅ **Bearer Token Authentication** - MCP endpoint requires valid OAuth tokens
 - ✅ **OAuth Metadata Discovery** (RFC 8414) - `.well-known/oauth-authorization-server`
+- ✅ **Refresh Token Rotation** - Tokens rotated on each refresh per OAuth 2.1 security best practices
 
 ### OAuth Implementation Details
 
@@ -129,74 +130,7 @@ TiDB Cloud API access is now protected via OAuth 2.1:
 
 ## Priority 3: Feature Enhancements
 
-### 3.1 Refresh Token Rotation
-
-**Status:** ✅ Complete
-
-**Problem:** Currently, refresh tokens are passed through from TiDB Cloud without rotation. If a refresh token is compromised, an attacker could use it indefinitely until it expires.
-
-**Solution:** Implement refresh token rotation per OAuth 2.1 security best practices. Each time a refresh token is used, issue a new refresh token and invalidate the old one.
-
-**Implementation:**
-
-1. **Store refresh tokens in Redis** with a unique identifier:
-   ```typescript
-   // When issuing tokens after OAuth callback
-   const refreshTokenId = crypto.randomUUID();
-   await redis.set(`oauth:refresh:${refreshTokenId}`, {
-     tidbCloudRefreshToken: upstream_refresh_token,
-     clientId: client_id,
-     issuedAt: Date.now(),
-   }, { ex: 30 * 24 * 60 * 60 }); // 30 days TTL
-   
-   // Return our own refresh token (the ID)
-   return { refresh_token: refreshTokenId, ... };
-   ```
-
-2. **Rotate on refresh grant**:
-   ```typescript
-   // In /api/token for grant_type=refresh_token
-   const tokenData = await redis.get(`oauth:refresh:${refresh_token}`);
-   if (!tokenData) {
-     return { error: 'invalid_grant' };
-   }
-   
-   // Delete old refresh token immediately
-   await redis.del(`oauth:refresh:${refresh_token}`);
-   
-   // Exchange with TiDB Cloud using stored upstream token
-   const newTokens = await exchangeRefreshToken(tokenData.tidbCloudRefreshToken);
-   
-   // Issue new refresh token
-   const newRefreshTokenId = crypto.randomUUID();
-   await redis.set(`oauth:refresh:${newRefreshTokenId}`, {
-     tidbCloudRefreshToken: newTokens.refresh_token,
-     clientId: tokenData.clientId,
-     issuedAt: Date.now(),
-   }, { ex: 30 * 24 * 60 * 60 });
-   
-   return {
-     access_token: newTokens.access_token,
-     refresh_token: newRefreshTokenId,
-     ...
-   };
-   ```
-
-3. **Detect token reuse** (optional, enhanced security):
-   - If a deleted refresh token is used again, it indicates potential theft
-   - Revoke all tokens for that client/user as a security measure
-
-**Benefits:**
-- Limits window of opportunity if refresh token is stolen
-- Enables detection of token theft via reuse detection
-- Compliant with OAuth 2.1 security recommendations
-
-**Files to modify:**
-- `packages/remote/api/oauth-callback.ts` - Store refresh token mapping
-- `packages/remote/api/token.ts` - Implement rotation on refresh grant
-- `packages/remote/src/store/types.ts` - Add refresh token storage interface
-
-### 3.2 OAuth Enhancements
+### 3.1 OAuth Enhancements
 
 **Status:** Core complete, enhancements pending
 
@@ -205,7 +139,7 @@ TiDB Cloud API access is now protected via OAuth 2.1:
 - ⬚ Scope-based access control
 - ⬚ Token revocation endpoint
 
-### 3.3 Additional Tools
+### 3.2 Additional Tools
 
 Consider adding tools for:
 
@@ -214,12 +148,12 @@ Consider adding tools for:
 - **Metrics** - Cluster performance metrics
 - **Billing** - Cost and usage information
 
-### 3.4 Multi-Cluster Support
+### 3.3 Multi-Cluster Support
 
 - Support multiple TiDB Cloud organizations
 - Add cluster aliasing for easier reference
 
-### 3.5 Per-User Database Configuration (UX Improvement)
+### 3.4 Per-User Database Configuration (UX Improvement)
 
 **Status:** ✅ Complete
 
@@ -320,7 +254,6 @@ Claude: "Found prod-cluster! Here are the connection details:
 | P1 | Request Validation | 2-3 hours | Partial |
 | P2 | Enhanced Health Checks | 1-2 hours | Not started |
 | P2 | Structured Logging | 1-2 hours | Not started |
-| P3 | Refresh Token Rotation | 2-3 hours | ✅ Complete |
 | P3 | Token Revocation | 2-3 hours | Not started |
 | P3 | Additional Tools | 4-8 hours each | Not started |
 | P3 | Per-User DB Config (env var guidance) | N/A | ✅ No new tools needed |
