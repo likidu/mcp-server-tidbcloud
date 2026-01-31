@@ -150,8 +150,11 @@ function resolveConfig(
   if (!host || !username || !password) {
     throw new TiDBDatabaseError(
       "Database connection not configured. " +
-        "Please provide host, username, and password parameters. " +
-        "Use tidbcloud_get_cluster to retrieve the host and port for your cluster.",
+        "The user has two options: " +
+        "(1) Provide host, username, and password in this conversation, or " +
+        "(2) Configure credentials in Claude Desktop config using mcp-remote --header flags " +
+        "(recommended for persistent setup - credentials stay local, never stored on server). " +
+        "Use tidbcloud_get_cluster to retrieve the host and port for the cluster.",
     );
   }
 
