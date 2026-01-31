@@ -6,10 +6,16 @@
  */
 
 import { Redis } from "@upstash/redis";
-import type { OAuthStore, AuthorizationState, AuthorizationCode } from "./types.js";
+import type {
+  OAuthStore,
+  AuthorizationState,
+  AuthorizationCode,
+  RefreshTokenData,
+} from "./types.js";
 
 const STATE_PREFIX = "oauth:state:";
 const CODE_PREFIX = "oauth:code:";
+const REFRESH_PREFIX = "oauth:refresh:";
 
 export class UpstashStore implements OAuthStore {
   private redis: Redis;
@@ -19,7 +25,11 @@ export class UpstashStore implements OAuthStore {
     this.redis = Redis.fromEnv();
   }
 
-  async setState(key: string, data: AuthorizationState, ttlSeconds: number): Promise<void> {
+  async setState(
+    key: string,
+    data: AuthorizationState,
+    ttlSeconds: number,
+  ): Promise<void> {
     await this.redis.set(`${STATE_PREFIX}${key}`, JSON.stringify(data), {
       ex: ttlSeconds,
     });
@@ -40,7 +50,11 @@ export class UpstashStore implements OAuthStore {
     await this.redis.del(`${STATE_PREFIX}${key}`);
   }
 
-  async setCode(key: string, data: AuthorizationCode, ttlSeconds: number): Promise<void> {
+  async setCode(
+    key: string,
+    data: AuthorizationCode,
+    ttlSeconds: number,
+  ): Promise<void> {
     await this.redis.set(`${CODE_PREFIX}${key}`, JSON.stringify(data), {
       ex: ttlSeconds,
     });
@@ -54,6 +68,35 @@ export class UpstashStore implements OAuthStore {
     if (!data) return null;
 
     // Delete the code (one-time use)
+    await this.redis.del(fullKey);
+
+    try {
+      return typeof data === "string" ? JSON.parse(data) : data;
+    } catch {
+      return null;
+    }
+  }
+
+  async setRefreshToken(
+    key: string,
+    data: RefreshTokenData,
+    ttlSeconds: number,
+  ): Promise<void> {
+    await this.redis.set(`${REFRESH_PREFIX}${key}`, JSON.stringify(data), {
+      ex: ttlSeconds,
+    });
+  }
+
+  async getAndDeleteRefreshToken(
+    key: string,
+  ): Promise<RefreshTokenData | null> {
+    const fullKey = `${REFRESH_PREFIX}${key}`;
+
+    // Get and delete atomically (one-time use for rotation)
+    const data = await this.redis.get<string>(fullKey);
+    if (!data) return null;
+
+    // Delete the refresh token immediately (rotation)
     await this.redis.del(fullKey);
 
     try {

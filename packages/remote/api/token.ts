@@ -16,6 +16,16 @@ const TIDB_OAUTH_ENDPOINTS: Record<Environment, { token: string }> = {
   prod: { token: "https://oauth.tidbcloud.com/v1/token" },
 };
 
+const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days
+
+function generateRandomString(length: number): string {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array, (byte) => chars[byte % chars.length]).join("");
+}
+
 async function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -174,7 +184,7 @@ export default async function handler(
       return;
     }
 
-    // Handle refresh_token grant
+    // Handle refresh_token grant with token rotation
     if (grantType === "refresh_token") {
       const refreshToken = body.refresh_token;
 
@@ -203,7 +213,27 @@ export default async function handler(
         return;
       }
 
+      // Look up and delete the refresh token (one-time use for rotation)
+      const tokenData = await store.getAndDeleteRefreshToken(refreshToken);
+      if (!tokenData) {
+        // Token not found - either invalid, expired, or already used (potential theft)
+        console.warn(
+          "Refresh token not found or already used:",
+          refreshToken.substring(0, 8) + "...",
+        );
+        res.statusCode = 400;
+        res.end(
+          JSON.stringify({
+            error: "invalid_grant",
+            error_description:
+              "Invalid or expired refresh token. Please re-authenticate.",
+          }),
+        );
+        return;
+      }
+
       try {
+        // Exchange with TiDB Cloud using the stored upstream refresh token
         const tokenUrl = TIDB_OAUTH_ENDPOINTS[config.environment].token;
         const tokenResponse = await fetch(tokenUrl, {
           method: "POST",
@@ -212,7 +242,7 @@ export default async function handler(
             client_id: serverClientId,
             client_secret: serverClientSecret,
             grant_type: "refresh_token",
-            refresh_token: refreshToken,
+            refresh_token: tokenData.upstreamRefreshToken,
           }),
         });
 
@@ -225,26 +255,45 @@ export default async function handler(
           res.end(
             JSON.stringify({
               error: "invalid_grant",
-              error_description: "Failed to refresh token",
+              error_description:
+                "Failed to refresh token with upstream provider",
             }),
           );
           return;
         }
 
-        const tokenData = (await tokenResponse.json()) as {
+        const newTokens = (await tokenResponse.json()) as {
           access_token: string;
           token_type: string;
           expires_in: number;
           refresh_token?: string;
         };
 
+        // Issue a new rotated refresh token
+        let newRefreshToken: string | undefined;
+        const upstreamRefreshToken =
+          newTokens.refresh_token || tokenData.upstreamRefreshToken;
+
+        if (upstreamRefreshToken) {
+          newRefreshToken = generateRandomString(32);
+          await store.setRefreshToken(
+            newRefreshToken,
+            {
+              upstreamRefreshToken,
+              clientId: tokenData.clientId,
+              issuedAt: Date.now(),
+            },
+            REFRESH_TOKEN_TTL,
+          );
+        }
+
         res.statusCode = 200;
         res.end(
           JSON.stringify({
-            access_token: tokenData.access_token,
+            access_token: newTokens.access_token,
             token_type: "Bearer",
-            expires_in: tokenData.expires_in,
-            refresh_token: tokenData.refresh_token || refreshToken,
+            expires_in: newTokens.expires_in,
+            refresh_token: newRefreshToken,
           }),
         );
         return;

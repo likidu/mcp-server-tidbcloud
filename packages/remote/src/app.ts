@@ -73,6 +73,7 @@ import { generateRandomString } from "./oauth-state.js";
 
 const OAUTH_STATE_TTL = 600; // 10 minutes
 const OAUTH_CODE_TTL = 300; // 5 minutes
+const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days
 
 // ============================================================
 // Hono App Setup
@@ -378,13 +379,29 @@ app.get("/oauth/callback", async (c) => {
       refresh_token?: string;
     };
 
+    // If TiDB Cloud returns a refresh token, store it with rotation support
+    let ourRefreshToken: string | undefined;
+    if (tokenData.refresh_token) {
+      ourRefreshToken = generateRandomString(32);
+      await store.setRefreshToken(
+        ourRefreshToken,
+        {
+          upstreamRefreshToken: tokenData.refresh_token,
+          clientId: stateData.clientId,
+          issuedAt: Date.now(),
+        },
+        REFRESH_TOKEN_TTL,
+      );
+    }
+
     // Store the authorization code with token data in Redis
+    // Use our rotatable refresh token ID instead of the upstream token
     const ourAuthCode = generateRandomString(32);
     await store.setCode(
       ourAuthCode,
       {
         accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token,
+        refreshToken: ourRefreshToken,
         expiresIn: tokenData.expires_in,
         redirectUri: stateData.redirectUri,
         codeChallenge: stateData.codeChallenge,
