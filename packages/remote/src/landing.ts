@@ -519,11 +519,7 @@ export function getLandingPageHtml(baseUrl: string): string {
                     <pre id="cursor-config">{
   "mcpServers": {
     "TiDB Cloud": {
-      "command": "npx",
-      "args": [
-        "-y", "mcp-remote",
-        "${mcpUrl}"
-      ]
+      "url": "${mcpUrl}"
     }
   }
 }</pre>
@@ -532,17 +528,14 @@ export function getLandingPageHtml(baseUrl: string): string {
 
             <div id="tab-vscode" class="tab-content">
                 <h4>Add the configuration to:</h4>
-                <span class="config-file">settings.json</span>
+                <span class="config-file">.vscode/mcp.json</span>
                 <div class="code-block">
                     <button class="copy-code-btn" onclick="copyCode('vscode-config')">Copy</button>
                     <pre id="vscode-config">{
-  "mcp.servers": {
+  "servers": {
     "TiDB Cloud": {
-      "command": "npx",
-      "args": [
-        "-y", "mcp-remote",
-        "${mcpUrl}"
-      ]
+      "type": "http",
+      "url": "${mcpUrl}"
     }
   }
 }</pre>
