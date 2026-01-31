@@ -203,9 +203,9 @@ app.get("/.well-known/oauth-authorization-server", (c) => {
 
   return c.json({
     issuer: baseUrl,
-    authorization_endpoint: `${baseUrl}/authorize`,
-    token_endpoint: `${baseUrl}/token`,
-    registration_endpoint: `${baseUrl}/register`,
+    authorization_endpoint: `${baseUrl}/api/authorize`,
+    token_endpoint: `${baseUrl}/api/token`,
+    registration_endpoint: `${baseUrl}/api/register`,
     scopes_supported: [OAUTH_SCOPE],
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
@@ -219,7 +219,7 @@ app.get("/.well-known/oauth-authorization-server", (c) => {
 // Dynamic Client Registration (RFC 7591)
 // ============================================================
 
-app.post("/register", async (c) => {
+app.post("/api/register", async (c) => {
   try {
     const body = await c.req.json();
     const clientId = `mcp_${generateRandomString(16)}`;
@@ -249,7 +249,7 @@ app.post("/register", async (c) => {
 // Authorization Endpoint
 // ============================================================
 
-app.get("/authorize", (c) => {
+app.get("/api/authorize", (c) => {
   const clientId = c.req.query("client_id");
   const redirectUri = c.req.query("redirect_uri");
   const responseType = c.req.query("response_type");
@@ -323,7 +323,7 @@ app.get("/authorize", (c) => {
 // OAuth Callback (receives code from TiDB Cloud)
 // ============================================================
 
-app.get("/callback", async (c) => {
+app.get("/api/callback", async (c) => {
   const code = c.req.query("code");
   const stateParam = c.req.query("state");
   const error = c.req.query("error");
@@ -456,7 +456,7 @@ app.get("/callback", async (c) => {
 // Token Endpoint
 // ============================================================
 
-app.post("/token", async (c) => {
+app.post("/api/token", async (c) => {
   const contentType = c.req.header("content-type") || "";
   const body = contentType.includes("application/x-www-form-urlencoded")
     ? ((await c.req.parseBody()) as Record<string, string>)
@@ -634,6 +634,7 @@ app.post("/token", async (c) => {
 // Alias: /oauth/callback (for backward compatibility with registered OAuth app)
 // ============================================================
 
+// Also handle /oauth/callback directly (registered with TiDB Cloud OAuth)
 app.get("/oauth/callback", async (c) => {
   const code = c.req.query("code");
   const stateParam = c.req.query("state");
