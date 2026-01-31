@@ -16,6 +16,10 @@
       "destination": "/api/oauth-callback"
     },
     {
+      "source": "/api/register",
+      "destination": "/api/register"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api"
     }
