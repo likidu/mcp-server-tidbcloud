@@ -179,7 +179,9 @@ export default async function handler(
 
     // Log the requesting client (informational)
     const mcpClientId = body.client_id || "unknown";
-    console.log(`[device-code] Device authorization requested by: ${mcpClientId}`);
+    console.log(
+      `[device-code] Device authorization requested by: ${mcpClientId}`,
+    );
 
     // Forward request to TiDB Cloud's device authorization endpoint
     const deviceAuthUrl =
@@ -199,16 +201,23 @@ export default async function handler(
     if (!response.ok) {
       const errorText = await response.text();
       console.error(
-        `[device-code] TiDB Cloud device authorization failed: ${errorText}`,
+        `[device-code] TiDB Cloud device authorization failed (${response.status}): ${errorText}`,
       );
-      res.statusCode = response.status;
-      res.end(
-        JSON.stringify({
-          error: "server_error",
-          error_description:
-            "Failed to initiate device authorization with TiDB Cloud",
-        }),
-      );
+
+      // Try to parse and forward the error from TiDB Cloud
+      try {
+        const errorJson = JSON.parse(errorText);
+        res.statusCode = response.status;
+        res.end(JSON.stringify(errorJson));
+      } catch {
+        res.statusCode = response.status;
+        res.end(
+          JSON.stringify({
+            error: "server_error",
+            error_description: `TiDB Cloud error: ${errorText}`,
+          }),
+        );
+      }
       return;
     }
 
