@@ -24,6 +24,10 @@
       "destination": "/api/token"
     },
     {
+      "source": "/api/device/code",
+      "destination": "/api/device"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api"
     }
