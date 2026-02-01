@@ -6,10 +6,57 @@
 /// <reference lib="dom" />
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 import { getStore } from "../dist/store/index.js";
 import { loadConfig, type Environment } from "../dist/config.js";
 
 const config = loadConfig();
+
+// Rate limiting for token endpoint (strict: 20 requests per minute)
+let ratelimit: Ratelimit | null = null;
+
+function getRatelimit(): Ratelimit | null {
+  if (ratelimit) return ratelimit;
+
+  if (
+    !process.env.UPSTASH_REDIS_REST_URL ||
+    !process.env.UPSTASH_REDIS_REST_TOKEN
+  ) {
+    return null;
+  }
+
+  try {
+    ratelimit = new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.slidingWindow(20, "1 m"),
+      prefix: "ratelimit:token",
+      analytics: true,
+    });
+    return ratelimit;
+  } catch (error) {
+    console.error("Failed to initialize rate limiter:", error);
+    return null;
+  }
+}
+
+function getClientIdentifier(req: IncomingMessage): string {
+  // Try to get client IP from various headers (Vercel/proxy scenarios)
+  const forwarded = req.headers["x-forwarded-for"];
+  if (forwarded) {
+    const ip = Array.isArray(forwarded)
+      ? forwarded[0]
+      : forwarded.split(",")[0];
+    return ip?.trim() || "unknown";
+  }
+
+  const realIp = req.headers["x-real-ip"];
+  if (realIp) {
+    return Array.isArray(realIp) ? realIp[0] : realIp;
+  }
+
+  return "unknown";
+}
 
 const TIDB_OAUTH_ENDPOINTS: Record<Environment, { token: string }> = {
   dev: { token: "https://oauth.dev.tidbcloud.com/v1/token" },
@@ -81,6 +128,37 @@ export default async function handler(
     res.statusCode = 405;
     res.end(JSON.stringify({ error: "Method not allowed" }));
     return;
+  }
+
+  // Apply rate limiting
+  const limiter = getRatelimit();
+  if (limiter) {
+    const identifier = getClientIdentifier(req);
+    try {
+      const { success, limit, remaining, reset } =
+        await limiter.limit(identifier);
+
+      res.setHeader("X-RateLimit-Limit", limit.toString());
+      res.setHeader("X-RateLimit-Remaining", remaining.toString());
+      res.setHeader("X-RateLimit-Reset", reset.toString());
+
+      if (!success) {
+        const retryAfter = Math.ceil((reset - Date.now()) / 1000);
+        res.setHeader("Retry-After", retryAfter.toString());
+        res.statusCode = 429;
+        res.end(
+          JSON.stringify({
+            error: "too_many_requests",
+            error_description: "Rate limit exceeded. Please try again later.",
+            retry_after: retryAfter,
+          }),
+        );
+        return;
+      }
+    } catch (error) {
+      // If rate limiting fails, allow the request through
+      console.error("Rate limiting error:", error);
+    }
   }
 
   try {
