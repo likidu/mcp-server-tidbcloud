@@ -56,28 +56,24 @@ Production security headers applied to all responses:
 
 ## Priority 1: Security Improvements
 
-### 1.1 Rate Limiting (High Priority)
+### 1.1 Rate Limiting
 
-**Status:** Not implemented
+**Status:** ✅ Implemented
 
-**Problem:** The current deployment has no per-client or per-IP rate limiting. The system relies only on OAuth state TTLs.
+Rate limiting is implemented using [@upstash/ratelimit](https://github.com/upstash/ratelimit) with sliding window algorithm:
 
-**Recommended Solution:** Use [@upstash/ratelimit](https://github.com/upstash/ratelimit) since Upstash Redis is already integrated.
+| Endpoint | Limit | Purpose |
+|----------|-------|---------|
+| All routes (global) | 100 req/min | General protection |
+| `/api/authorize` | 20 req/min | OAuth initiation protection |
+| `/api/token` | 20 req/min | Token endpoint protection |
+| `/mcp` | 100 req/min | MCP endpoint protection |
 
-```typescript
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
-
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(100, '1 m'), // 100 requests per minute
-});
-
-async function checkRateLimit(identifier: string): Promise<boolean> {
-  const { success } = await ratelimit.limit(identifier);
-  return success;
-}
-```
+**Features:**
+- Client identification via `X-Forwarded-For` or `X-Real-IP` headers
+- Rate limit headers in responses (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`)
+- `Retry-After` header on 429 responses
+- Graceful degradation if Redis unavailable
 
 ### 1.2 API Key Protection
 
@@ -95,9 +91,9 @@ TiDB Cloud API access is now protected via OAuth 2.1:
 - ✅ OAuth state validation with expiration checks
 - ✅ PKCE code verifier validation
 - ✅ Redirect URI validation
-- ⬚ Input validation for all tool parameters
-- ⬚ Request size limits
-- ⬚ Timeout handling for long-running operations
+- ✅ Input validation for all tool parameters (Zod schemas with `.strict()` mode)
+- ⬚ Request size limits (Vercel provides default limits)
+- ⬚ Timeout handling for long-running operations (TiDB Cloud API has own timeouts)
 
 ## Priority 2: Reliability Improvements
 
@@ -233,8 +229,8 @@ Claude: "Found prod-cluster! Here are the connection details:
 
 - ✅ Landing page with tool documentation
 - ✅ Quick-start guide on landing page
+- ✅ Example prompts for Claude (on landing page)
 - ⬚ API reference documentation
-- ⬚ Example prompts for Claude
 - ⬚ Document common error scenarios
 
 ### 4.3 CI/CD
@@ -250,7 +246,7 @@ Claude: "Found prod-cluster! Here are the connection details:
 | P1 | OAuth 2.1 Implementation | 8-12 hours | ✅ Complete |
 | P1 | Upstash Redis Integration | 2-3 hours | ✅ Complete |
 | P1 | Security Middleware | 2-3 hours | ✅ Complete |
-| P1 | Rate Limiting (Upstash) | 1-2 hours | Not started |
+| P1 | Rate Limiting (Upstash) | 1-2 hours | ✅ Complete |
 | P1 | Request Validation | 2-3 hours | Partial |
 | P2 | Enhanced Health Checks | 1-2 hours | Not started |
 | P2 | Structured Logging | 1-2 hours | Not started |

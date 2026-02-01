@@ -26,6 +26,7 @@ import {
   securityHeaders,
   requestId,
 } from "./middleware/security.js";
+import { rateLimiter, strictRateLimiter } from "./middleware/ratelimit.js";
 
 // ============================================================
 // Configuration
@@ -84,6 +85,7 @@ const app = new Hono();
 app.use("*", requestId());
 app.use("*", httpsEnforcement());
 app.use("*", securityHeaders());
+app.use("*", rateLimiter()); // Apply rate limiting to all routes
 app.use("*", logger());
 app.use(
   "*",
@@ -210,7 +212,8 @@ app.post("/api/register", async (c) => {
 // Authorization Endpoint
 // ============================================================
 
-app.get("/api/authorize", async (c) => {
+// Apply strict rate limiting to authorization endpoint
+app.get("/api/authorize", strictRateLimiter(), async (c) => {
   const clientId = c.req.query("client_id");
   const redirectUri = c.req.query("redirect_uri");
   const responseType = c.req.query("response_type");

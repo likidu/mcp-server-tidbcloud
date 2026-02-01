@@ -21,6 +21,8 @@ import {
 } from "@likidu/mcp-server-tidbcloud/tools";
 import { TiDBCloudClient } from "@likidu/mcp-server-tidbcloud/api";
 import type { Config, Environment } from "@likidu/mcp-server-tidbcloud/config";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
 // ============================================================
 // Constants
@@ -30,6 +32,50 @@ const API_BASE_URLS: Record<Environment, string> = {
   prod: "https://serverless.tidbapi.com",
   dev: "https://serverless.dev.tidbapi.com",
 };
+
+// ============================================================
+// Rate Limiting
+// ============================================================
+
+let ratelimit: Ratelimit | null = null;
+
+function getRatelimit(): Ratelimit | null {
+  if (ratelimit) return ratelimit;
+
+  if (
+    !process.env.UPSTASH_REDIS_REST_URL ||
+    !process.env.UPSTASH_REDIS_REST_TOKEN
+  ) {
+    return null;
+  }
+
+  try {
+    ratelimit = new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.slidingWindow(100, "1 m"), // 100 requests per minute
+      prefix: "ratelimit:mcp",
+    });
+    return ratelimit;
+  } catch {
+    return null;
+  }
+}
+
+function getClientIdentifier(req: VercelRequest): string {
+  // Use Bearer token if available
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+    return `token:${token.substring(7, 23)}`;
+  }
+
+  // Fall back to IP
+  const forwarded = req.headers["x-forwarded-for"];
+  const ip = Array.isArray(forwarded)
+    ? forwarded[0]
+    : forwarded?.split(",")[0]?.trim();
+  return `ip:${ip || "anonymous"}`;
+}
 
 // ============================================================
 // Helper Functions
@@ -116,6 +162,34 @@ export default async function handler(
   if (req.method === "OPTIONS") {
     res.status(204).end();
     return;
+  }
+
+  // Rate limiting
+  const limiter = getRatelimit();
+  if (limiter) {
+    try {
+      const identifier = getClientIdentifier(req);
+      const { success, limit, remaining, reset } =
+        await limiter.limit(identifier);
+
+      res.setHeader("X-RateLimit-Limit", limit.toString());
+      res.setHeader("X-RateLimit-Remaining", remaining.toString());
+      res.setHeader("X-RateLimit-Reset", reset.toString());
+
+      if (!success) {
+        const retryAfter = Math.ceil((reset - Date.now()) / 1000);
+        res.setHeader("Retry-After", retryAfter.toString());
+        res.status(429).json({
+          error: "too_many_requests",
+          error_description: "Rate limit exceeded. Please try again later.",
+          retry_after: retryAfter,
+        });
+        return;
+      }
+    } catch (error) {
+      // Log but don't block on rate limit errors
+      console.error("[ratelimit] Error:", error);
+    }
   }
 
   // Only handle POST for MCP requests (stateless mode)
