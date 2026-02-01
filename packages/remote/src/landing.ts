@@ -341,6 +341,54 @@ export function getLandingPageHtml(baseUrl: string): string {
             border-color: var(--text-secondary);
         }
 
+        /* Examples Section */
+        .examples-section {
+            margin-bottom: 3rem;
+        }
+
+        .examples-section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .example-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .example-card:hover {
+            border-color: var(--primary-red);
+            background: rgba(227, 12, 27, 0.05);
+        }
+
+        .example-card p {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .example-card .example-category {
+            font-size: 0.7rem;
+            color: var(--primary-red);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
         /* Tools Section */
         .tools-section {
             margin-bottom: 3rem;
@@ -572,6 +620,36 @@ export function getLandingPageHtml(baseUrl: string): string {
             <p style="margin-top: 0.75rem; margin-bottom: 0;"><a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices" target="_blank">Read MCP Security Best Practices →</a></p>
         </div>
 
+        <section class="examples-section">
+            <h2>Example Prompts</h2>
+            <div class="examples-grid">
+                <div class="example-card" onclick="copyExample(this)">
+                    <div class="example-category">Clusters</div>
+                    <p>List all my TiDB Cloud clusters</p>
+                </div>
+                <div class="example-card" onclick="copyExample(this)">
+                    <div class="example-category">Clusters</div>
+                    <p>Create a new serverless cluster named "dev-cluster" in us-east-1</p>
+                </div>
+                <div class="example-card" onclick="copyExample(this)">
+                    <div class="example-category">Branches</div>
+                    <p>Create a branch called "feature-test" from my prod-cluster</p>
+                </div>
+                <div class="example-card" onclick="copyExample(this)">
+                    <div class="example-category">Database</div>
+                    <p>Connect to my-cluster and show all databases</p>
+                </div>
+                <div class="example-card" onclick="copyExample(this)">
+                    <div class="example-category">Database</div>
+                    <p>Show the schema of the users table in the app database</p>
+                </div>
+                <div class="example-card" onclick="copyExample(this)">
+                    <div class="example-category">Database</div>
+                    <p>Run a query to find the top 10 customers by order count</p>
+                </div>
+            </div>
+        </section>
+
         <section class="tools-section">
             <h2>Available Tools</h2>
 
@@ -707,6 +785,19 @@ export function getLandingPageHtml(baseUrl: string): string {
                 setTimeout(() => {
                     btn.textContent = originalText;
                 }, 2000);
+            });
+        }
+
+        function copyExample(card) {
+            const text = card.querySelector('p').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = card.querySelector('p').textContent;
+                card.querySelector('p').textContent = 'Copied to clipboard!';
+                card.style.borderColor = 'var(--primary-red)';
+                setTimeout(() => {
+                    card.querySelector('p').textContent = originalText;
+                    card.style.borderColor = '';
+                }, 1500);
             });
         }
     </script>

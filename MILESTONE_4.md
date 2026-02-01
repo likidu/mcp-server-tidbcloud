@@ -91,9 +91,9 @@ TiDB Cloud API access is now protected via OAuth 2.1:
 - ✅ OAuth state validation with expiration checks
 - ✅ PKCE code verifier validation
 - ✅ Redirect URI validation
-- ⬚ Input validation for all tool parameters
-- ⬚ Request size limits
-- ⬚ Timeout handling for long-running operations
+- ✅ Input validation for all tool parameters (Zod schemas with `.strict()` mode)
+- ⬚ Request size limits (Vercel provides default limits)
+- ⬚ Timeout handling for long-running operations (TiDB Cloud API has own timeouts)
 
 ## Priority 2: Reliability Improvements
 
@@ -229,8 +229,8 @@ Claude: "Found prod-cluster! Here are the connection details:
 
 - ✅ Landing page with tool documentation
 - ✅ Quick-start guide on landing page
+- ✅ Example prompts for Claude (on landing page)
 - ⬚ API reference documentation
-- ⬚ Example prompts for Claude
 - ⬚ Document common error scenarios
 
 ### 4.3 CI/CD
