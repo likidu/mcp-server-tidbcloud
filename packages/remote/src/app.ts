@@ -115,6 +115,17 @@ app.get("/", (c) => {
   return c.html(getLandingPageHtml(`${scheme}://${host}`));
 });
 
+// ============================================================
+// Skill Documentation (for OpenClaw and other AI agents)
+// ============================================================
+
+import { getSkillContent } from "./skill.js";
+
+app.get("/skill.md", (c) => {
+  c.header("Content-Type", "text/markdown; charset=utf-8");
+  return c.body(getSkillContent());
+});
+
 app.get("/api", (c) => {
   const host = c.req.header("host") || config.server.serverHost;
   const scheme = c.req.header("x-forwarded-proto") || "https";

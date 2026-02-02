@@ -28,6 +28,10 @@
       "destination": "/api/device"
     },
     {
+      "source": "/skill.md",
+      "destination": "/api"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api"
     }
