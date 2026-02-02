@@ -63,6 +63,11 @@ const TIDB_OAUTH_ENDPOINTS: Record<Environment, { token: string }> = {
   prod: { token: "https://oauth.tidbcloud.com/v1/token" },
 };
 
+/**
+ * Device Code grant type (RFC 8628)
+ */
+const DEVICE_CODE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
+
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days
 
 function generateRandomString(length: number): string {
@@ -383,6 +388,124 @@ export default async function handler(
           JSON.stringify({
             error: "server_error",
             error_description: "Failed to refresh token",
+          }),
+        );
+        return;
+      }
+    }
+
+    // Handle device_code grant (RFC 8628)
+    if (grantType === DEVICE_CODE_GRANT_TYPE) {
+      const deviceCode = body.device_code;
+
+      if (!deviceCode) {
+        res.statusCode = 400;
+        res.end(
+          JSON.stringify({
+            error: "invalid_request",
+            error_description: "Missing device_code",
+          }),
+        );
+        return;
+      }
+
+      const serverClientId = config.oauth?.clientId;
+      const serverClientSecret = config.oauth?.clientSecret;
+
+      if (!serverClientId || !serverClientSecret) {
+        res.statusCode = 500;
+        res.end(
+          JSON.stringify({
+            error: "server_error",
+            error_description: "OAuth not configured",
+          }),
+        );
+        return;
+      }
+
+      try {
+        // Forward to TiDB Cloud's token endpoint with device_code grant
+        const tokenUrl = TIDB_OAUTH_ENDPOINTS[config.environment].token;
+        const tokenResponse = await fetch(tokenUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: serverClientId,
+            client_secret: serverClientSecret,
+            grant_type: DEVICE_CODE_GRANT_TYPE,
+            device_code: deviceCode,
+          }),
+        });
+
+        // Handle polling responses (authorization_pending, slow_down)
+        if (!tokenResponse.ok) {
+          const errorData = (await tokenResponse.json()) as {
+            error: string;
+            error_description?: string;
+          };
+
+          // Pass through authorization_pending and slow_down errors
+          // These are expected during polling and client should retry
+          if (
+            errorData.error === "authorization_pending" ||
+            errorData.error === "slow_down"
+          ) {
+            res.statusCode = 400;
+            res.end(JSON.stringify(errorData));
+            return;
+          }
+
+          // For other errors (expired_token, access_denied), pass through
+          console.error(
+            "[token] Device code token exchange failed:",
+            errorData,
+          );
+          res.statusCode = tokenResponse.status;
+          res.end(JSON.stringify(errorData));
+          return;
+        }
+
+        // Success - user has authorized
+        const tokenData = (await tokenResponse.json()) as {
+          access_token: string;
+          token_type: string;
+          expires_in: number;
+          refresh_token?: string;
+        };
+
+        // If TiDB Cloud returns a refresh token, store it with rotation support
+        let ourRefreshToken: string | undefined;
+        if (tokenData.refresh_token) {
+          ourRefreshToken = generateRandomString(32);
+          const store = getStore();
+          await store.setRefreshToken(
+            ourRefreshToken,
+            {
+              upstreamRefreshToken: tokenData.refresh_token,
+              clientId: body.client_id || "device_code_client",
+              issuedAt: Date.now(),
+            },
+            REFRESH_TOKEN_TTL,
+          );
+        }
+
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            access_token: tokenData.access_token,
+            token_type: "Bearer",
+            expires_in: tokenData.expires_in,
+            refresh_token: ourRefreshToken,
+          }),
+        );
+        return;
+      } catch (err) {
+        console.error("[token] Device code error:", err);
+        res.statusCode = 500;
+        res.end(
+          JSON.stringify({
+            error: "server_error",
+            error_description: "Failed to exchange device code",
           }),
         );
         return;

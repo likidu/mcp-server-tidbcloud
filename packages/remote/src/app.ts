@@ -115,6 +115,17 @@ app.get("/", (c) => {
   return c.html(getLandingPageHtml(`${scheme}://${host}`));
 });
 
+// ============================================================
+// Skill Documentation (for OpenClaw and other AI agents)
+// ============================================================
+
+import { getSkillContent } from "./skill.js";
+
+app.get("/skill.md", (c) => {
+  c.header("Content-Type", "text/markdown; charset=utf-8");
+  return c.body(getSkillContent());
+});
+
 app.get("/api", (c) => {
   const host = c.req.header("host") || config.server.serverHost;
   const scheme = c.req.header("x-forwarded-proto") || "https";
@@ -129,9 +140,10 @@ app.get("/api", (c) => {
       health: `${baseUrl}/health`,
       oauth: {
         metadata: `${baseUrl}/.well-known/oauth-authorization-server`,
-        authorize: `${baseUrl}/authorize`,
-        token: `${baseUrl}/token`,
-        register: `${baseUrl}/register`,
+        authorize: `${baseUrl}/api/authorize`,
+        token: `${baseUrl}/api/token`,
+        register: `${baseUrl}/api/register`,
+        device_code: `${baseUrl}/api/device/code`,
       },
     },
     documentation: "https://github.com/likidu/mcp-server-tidbcloud",
@@ -169,9 +181,14 @@ app.get("/.well-known/oauth-authorization-server", (c) => {
     authorization_endpoint: `${baseUrl}/api/authorize`,
     token_endpoint: `${baseUrl}/api/token`,
     registration_endpoint: `${baseUrl}/api/register`,
+    device_authorization_endpoint: `${baseUrl}/api/device/code`,
     scopes_supported: [OAUTH_SCOPE],
     response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code", "refresh_token"],
+    grant_types_supported: [
+      "authorization_code",
+      "refresh_token",
+      "urn:ietf:params:oauth:grant-type:device_code",
+    ],
     token_endpoint_auth_methods_supported: ["none", "client_secret_post"],
     code_challenge_methods_supported: ["S256", "plain"],
     service_documentation: "https://github.com/likidu/mcp-server-tidbcloud",

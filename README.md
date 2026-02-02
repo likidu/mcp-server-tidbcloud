@@ -56,6 +56,16 @@ Connect to the hosted MCP server using `mcp-remote`. No local setup or API keys 
 
 When you first use the server, you'll be prompted to authenticate with your TiDB Cloud account.
 
+#### Authentication Methods
+
+The remote server supports two OAuth authentication methods:
+
+1. **Authorization Code Flow (Default)**: For clients with browser support (Cursor, Claude Desktop with mcp-remote). The client redirects you to TiDB Cloud to authenticate.
+
+2. **Device Code Flow**: For headless/CLI clients that cannot handle browser redirects. The client displays a URL and code - you visit the URL in any browser to authenticate.
+
+MCP clients automatically discover supported authentication methods via the OAuth metadata endpoint.
+
 **With Database Credentials (for SQL operations):**
 
 To use database tools (`show_databases`, `db_query`, `db_execute`, etc.), configure your database credentials. The credentials are stored locally and sent via custom headers:
