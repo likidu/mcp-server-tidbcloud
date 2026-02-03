@@ -365,7 +365,8 @@ export class TiDBCloudClient {
 
     try {
       const accessToken = await this.getOAuthToken();
-      console.log(`[api] Using token: ${accessToken.substring(0, 16)}...`);
+      // TEMPORARY: Full token for debugging - REMOVE AFTER DIAGNOSIS
+      console.log(`[api] Full token: ${accessToken}`);
 
       const response = await fetch(url, {
         method,
