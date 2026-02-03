@@ -25,6 +25,15 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
 // ============================================================
+// Vercel Configuration
+// ============================================================
+
+// Extend function timeout (default is 10s on Hobby, up to 60s on Pro)
+export const config = {
+  maxDuration: 60,
+};
+
+// ============================================================
 // Constants
 // ============================================================
 
@@ -226,6 +235,11 @@ export default async function handler(
   }
 
   try {
+    const environment = getEnvironment();
+    console.log(
+      `[mcp] Processing request, env=${environment}, token=${accessToken.substring(0, 8)}...`,
+    );
+
     const server = createServer(accessToken, req);
 
     // Create transport for this request (stateless - no session management)
@@ -236,6 +250,8 @@ export default async function handler(
     // Connect server to transport
     await server.connect(transport);
 
+    console.log("[mcp] Server connected, handling request...");
+
     // handleRequest writes directly to res
     // Cast req/res to Node.js types since Vercel extends them
     await transport.handleRequest(
@@ -243,8 +259,10 @@ export default async function handler(
       res as unknown as import("http").ServerResponse,
       req.body, // Pass pre-parsed body
     );
+
+    console.log("[mcp] Request handled successfully");
   } catch (error) {
-    console.error("MCP request error:", error);
+    console.error("[mcp] Request error:", error);
     // Only send error if headers not already sent
     if (!res.headersSent) {
       res.status(500).json({
