@@ -377,23 +377,29 @@ export class TiDBCloudClient {
 
       clearTimeout(timeoutId);
 
-      // If token expired, clear cache and retry once
-      if (response.status === 401) {
-        this.cachedToken = undefined;
-        const newToken = await this.getOAuthToken();
+      // If token expired and we have a refresh token, try to refresh and retry once
+      if (response.status === 401 && this.cachedToken?.refreshToken) {
+        try {
+          const newToken = await this.refreshOAuthToken(
+            this.cachedToken.refreshToken,
+          );
 
-        const retryResponse = await fetch(url, {
-          method,
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: `Bearer ${newToken}`,
-          },
-          body: body ? JSON.stringify(body) : undefined,
-          signal: controller.signal,
-        });
+          const retryResponse = await fetch(url, {
+            method,
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              Authorization: `Bearer ${newToken}`,
+            },
+            body: body ? JSON.stringify(body) : undefined,
+            signal: controller.signal,
+          });
 
-        return this.handleResponse<T>(retryResponse);
+          return this.handleResponse<T>(retryResponse);
+        } catch {
+          // Refresh failed, return the original 401 response
+          return this.handleResponse<T>(response);
+        }
       }
 
       return this.handleResponse<T>(response);
@@ -820,7 +826,7 @@ export function formatApiError(error: unknown): string {
       case 400:
         return `Error: Invalid request. ${error.message}`;
       case 401:
-        return "Error: Authentication failed. Please check your public key and private key.";
+        return "Error: Authentication failed. Your access token may have expired. Please re-authenticate.";
       case 403:
         return "Error: Permission denied. You don't have access to this resource.";
       case 404:
