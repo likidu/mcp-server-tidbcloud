@@ -16,7 +16,6 @@
  * 8. Client includes token in Authorization header for /mcp requests
  */
 
-import { createRequire } from "node:module";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -29,11 +28,9 @@ import {
 } from "./middleware/security.js";
 import { rateLimiter, strictRateLimiter } from "./middleware/ratelimit.js";
 
-// Read version from package.json (source of truth)
-const require = createRequire(import.meta.url);
-const { version: VERSION } = require("../../package.json") as {
-  version: string;
-};
+// Version is injected at build time or read from environment
+// This avoids runtime require() of package.json which fails in Vercel serverless
+const VERSION = process.env.npm_package_version || "0.5.1";
 
 // ============================================================
 // Configuration
