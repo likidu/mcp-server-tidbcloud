@@ -361,8 +361,11 @@ export class TiDBCloudClient {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
+    console.log(`[api] ${method} ${url}`);
+
     try {
       const accessToken = await this.getOAuthToken();
+      console.log(`[api] Using token: ${accessToken.substring(0, 16)}...`);
 
       const response = await fetch(url, {
         method,
@@ -376,6 +379,8 @@ export class TiDBCloudClient {
       });
 
       clearTimeout(timeoutId);
+
+      console.log(`[api] Response: ${response.status} ${response.statusText}`);
 
       // If token expired and we have a refresh token, try to refresh and retry once
       if (response.status === 401 && this.cachedToken?.refreshToken) {
