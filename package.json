@@ -1,6 +1,6 @@
 {
   "name": "mcp-server-tidbcloud",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "MCP server for TiDB Cloud API integration",
   "scripts": {

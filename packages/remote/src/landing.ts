@@ -2,7 +2,7 @@
  * Landing page HTML for TiDB Cloud MCP Server
  */
 
-export function getLandingPageHtml(baseUrl: string): string {
+export function getLandingPageHtml(baseUrl: string, version: string): string {
   const mcpUrl = `${baseUrl}/mcp`;
 
   return `<!DOCTYPE html>
@@ -503,7 +503,7 @@ export function getLandingPageHtml(baseUrl: string): string {
                     <polygon fill="#fff" points="144 103.95 144 187.06 180 166.28 180 83.14 144 103.95" />
                 </svg>
                 <span class="logo-text">TiDB Cloud MCP Server</span>
-                <span class="version">v0.5.0</span>
+                <span class="version">v${version}</span>
             </div>
             <div class="header-links">
                 <a href="https://github.com/likidu/mcp-server-tidbcloud" target="_blank">GitHub</a>

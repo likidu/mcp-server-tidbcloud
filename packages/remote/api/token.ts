@@ -9,7 +9,11 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { getStore } from "../dist/store/index.js";
-import { loadConfig, type Environment } from "../dist/config.js";
+import {
+  loadConfig,
+  type Environment,
+  type OAuthFlowType,
+} from "../dist/config.js";
 
 const config = loadConfig();
 
@@ -396,6 +400,20 @@ export default async function handler(
 
     // Handle device_code grant (RFC 8628)
     if (grantType === DEVICE_CODE_GRANT_TYPE) {
+      // Check if device code flow is enabled
+      if (config.oauthFlowType !== "device_code") {
+        res.statusCode = 400;
+        res.end(
+          JSON.stringify({
+            error: "unsupported_grant_type",
+            error_description:
+              "Device code flow is not enabled. Server is configured for authorization code flow. " +
+              "Set TIDB_CLOUD_OAUTH_FLOW=device_code to enable device code flow.",
+          }),
+        );
+        return;
+      }
+
       const deviceCode = body.device_code;
 
       if (!deviceCode) {

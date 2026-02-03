@@ -16,6 +16,7 @@
  * 8. Client includes token in Authorization header for /mcp requests
  */
 
+import { createRequire } from "node:module";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -27,6 +28,12 @@ import {
   requestId,
 } from "./middleware/security.js";
 import { rateLimiter, strictRateLimiter } from "./middleware/ratelimit.js";
+
+// Read version from package.json (source of truth)
+const require = createRequire(import.meta.url);
+const { version: VERSION } = require("../../package.json") as {
+  version: string;
+};
 
 // ============================================================
 // Configuration
@@ -105,14 +112,14 @@ app.get("/health", (c) => {
   return c.json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    version: "0.1.0",
+    version: VERSION,
   });
 });
 
 app.get("/", (c) => {
   const host = c.req.header("host") || config.server.serverHost;
   const scheme = c.req.header("x-forwarded-proto") || "https";
-  return c.html(getLandingPageHtml(`${scheme}://${host}`));
+  return c.html(getLandingPageHtml(`${scheme}://${host}`, VERSION));
 });
 
 // ============================================================
@@ -133,7 +140,7 @@ app.get("/api", (c) => {
 
   return c.json({
     name: "TiDB Cloud MCP Server",
-    version: "0.1.0",
+    version: VERSION,
     description: "MCP server for TiDB Cloud with OAuth 2.1 authentication",
     endpoints: {
       mcp: `${baseUrl}/mcp`,
@@ -176,23 +183,35 @@ app.get("/.well-known/oauth-authorization-server", (c) => {
   const scheme = c.req.header("x-forwarded-proto") || "https";
   const baseUrl = `${scheme}://${host}`;
 
-  return c.json({
+  // Build grant_types_supported based on configured flow type
+  const grantTypesSupported: string[] = ["refresh_token"];
+  if (config.oauthFlowType === "auth_code") {
+    grantTypesSupported.unshift("authorization_code");
+  } else if (config.oauthFlowType === "device_code") {
+    grantTypesSupported.unshift("urn:ietf:params:oauth:grant-type:device_code");
+  }
+
+  // Build response based on configured flow type
+  const metadata: Record<string, unknown> = {
     issuer: baseUrl,
-    authorization_endpoint: `${baseUrl}/api/authorize`,
     token_endpoint: `${baseUrl}/api/token`,
     registration_endpoint: `${baseUrl}/api/register`,
-    device_authorization_endpoint: `${baseUrl}/api/device/code`,
     scopes_supported: [OAUTH_SCOPE],
     response_types_supported: ["code"],
-    grant_types_supported: [
-      "authorization_code",
-      "refresh_token",
-      "urn:ietf:params:oauth:grant-type:device_code",
-    ],
+    grant_types_supported: grantTypesSupported,
     token_endpoint_auth_methods_supported: ["none", "client_secret_post"],
     code_challenge_methods_supported: ["S256", "plain"],
     service_documentation: "https://github.com/likidu/mcp-server-tidbcloud",
-  });
+  };
+
+  // Only advertise endpoints for enabled flows
+  if (config.oauthFlowType === "auth_code") {
+    metadata.authorization_endpoint = `${baseUrl}/api/authorize`;
+  } else if (config.oauthFlowType === "device_code") {
+    metadata.device_authorization_endpoint = `${baseUrl}/api/device/code`;
+  }
+
+  return c.json(metadata);
 });
 
 // ============================================================
@@ -266,6 +285,19 @@ app.get("/api/authorize", strictRateLimiter(), async (c) => {
         error_description: "OAuth not configured on server",
       },
       500,
+    );
+  }
+
+  // Check if authorization code flow is enabled
+  if (config.oauthFlowType !== "auth_code") {
+    return c.json(
+      {
+        error: "unsupported_response_type",
+        error_description:
+          "Authorization code flow is not enabled. Server is configured for device code flow. " +
+          "Set TIDB_CLOUD_OAUTH_FLOW=auth_code to enable authorization code flow.",
+      },
+      400,
     );
   }
 

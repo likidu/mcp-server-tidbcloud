@@ -20,10 +20,21 @@ export type Environment = "dev" | "prod";
  */
 export type AuthMode = "oauth" | "digest";
 
+/**
+ * OAuth flow type for TiDB Cloud
+ * - auth_code: Authorization Code flow (for web clients like Claude Desktop, Cursor)
+ * - device_code: Device Code flow (for headless clients like OpenClaw)
+ *
+ * Note: TiDB Cloud OAuth currently only supports one flow type per client credentials.
+ * Set this to match the flow type configured for your OAuth app in TiDB Cloud.
+ */
+export type OAuthFlowType = "auth_code" | "device_code";
+
 export interface Config {
   server: ServerConfig;
   environment: Environment;
   authMode?: AuthMode;
+  oauthFlowType?: OAuthFlowType;
   oauth?: {
     clientId: string;
     clientSecret: string;
@@ -117,6 +128,14 @@ export function loadConfig(): Config {
       ? "digest"
       : undefined;
 
+  // Determine OAuth flow type (defaults to auth_code for backwards compatibility)
+  const oauthFlowValue = process.env.TIDB_CLOUD_OAUTH_FLOW?.toLowerCase();
+  const oauthFlowType: OAuthFlowType | undefined = hasOAuth
+    ? oauthFlowValue === "device_code"
+      ? "device_code"
+      : "auth_code"
+    : undefined;
+
   // API base URL based on environment, can be overridden with TIDB_CLOUD_API_URL
   const apiBaseUrl =
     process.env.TIDB_CLOUD_API_URL || API_BASE_URLS[environment];
@@ -129,6 +148,7 @@ export function loadConfig(): Config {
     },
     environment,
     authMode,
+    oauthFlowType,
     oauth: hasOAuth
       ? {
           clientId: oauthClientId!,
@@ -193,6 +213,11 @@ export function validateConfig(config: Config): void {
     console.log(
       `[config] Authentication mode: ${config.authMode === "oauth" ? "OAuth" : "Digest (API Key)"}`,
     );
+    if (config.authMode === "oauth" && config.oauthFlowType) {
+      console.log(
+        `[config] OAuth flow type: ${config.oauthFlowType === "auth_code" ? "Authorization Code" : "Device Code"}`,
+      );
+    }
     console.log(`[config] API base URL: ${config.apiBaseUrl}`);
   }
 
