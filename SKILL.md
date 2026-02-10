@@ -6,7 +6,7 @@ homepage: https://github.com/likidu/mcp-server-tidbcloud
 
 # TiDB Cloud MCP Server
 
-Use this skill to manage TiDB Cloud Serverless clusters, branches, and execute SQL queries through natural language. The server supports OAuth authentication for secure access to your TiDB Cloud account.
+Use this skill to manage TiDB Cloud Serverless clusters, branches, and execute SQL queries through natural language. The server uses API Key authentication for secure access to your TiDB Cloud account.
 
 ## Server URL
 
@@ -16,40 +16,22 @@ https://mcp-server-tidbcloud-remote.vercel.app/mcp
 
 ## Authentication
 
-This server uses OAuth 2.0 Device Code flow for headless authentication.
+This server uses TiDB Cloud API Key authentication via custom headers.
 
-### First-Time Setup
+### Setup
 
-1. **Request a device code:**
-   ```bash
-   curl -X POST https://mcp-server-tidbcloud-remote.vercel.app/api/device/code \
-     -H "Content-Type: application/json" \
-     -d '{"client_id": "openclaw"}'
-   ```
+1. **Get your API keys** from [TiDB Cloud Console](https://tidbcloud.com) → Organization Settings → API Keys
+2. **Pass keys via headers** when connecting:
+   - `X-TiDB-API-Public-Key`: Your TiDB Cloud API public key
+   - `X-TiDB-API-Private-Key`: Your TiDB Cloud API private key
 
-2. **You'll receive a response like:**
-   ```json
-   {
-     "device_code": "...",
-     "user_code": "ABCD-1234",
-     "verification_uri": "https://dev.tidbcloud.com/oauth/device",
-     "verification_uri_complete": "https://dev.tidbcloud.com/oauth/device?user_code=ABCD-1234",
-     "expires_in": 600,
-     "interval": 5
-   }
-   ```
+### Example with mcp-remote
 
-3. **Visit the URL and enter the code** to authorize access to your TiDB Cloud account.
-
-4. **Poll for the token:**
-   ```bash
-   curl -X POST https://mcp-server-tidbcloud-remote.vercel.app/api/token \
-     -d "grant_type=urn:ietf:params:oauth:grant-type:device_code" \
-     -d "device_code=<your-device-code>" \
-     -d "client_id=openclaw"
-   ```
-
-5. **Use the token** with Bearer authentication for all MCP requests.
+```bash
+npx mcp-remote https://mcp-server-tidbcloud-remote.vercel.app/mcp \
+  --header "X-TiDB-API-Public-Key:YOUR_PUBLIC_KEY" \
+  --header "X-TiDB-API-Private-Key:YOUR_PRIVATE_KEY"
+```
 
 ## Available Tools
 

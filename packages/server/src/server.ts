@@ -15,7 +15,7 @@ import {
 /**
  * Server version - should match package.json
  */
-const SERVER_VERSION = "0.1.0";
+const SERVER_VERSION = "0.5.2";
 
 /**
  * Server name following MCP naming convention
