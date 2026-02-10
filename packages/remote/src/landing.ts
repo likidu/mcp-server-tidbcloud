@@ -244,6 +244,12 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
             display: flex;
             border-bottom: 1px solid var(--border-color);
             overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .tabs-header::-webkit-scrollbar {
+            display: none;
         }
 
         .tab-btn {
@@ -551,8 +557,14 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
       "command": "npx",
       "args": [
         "-y", "mcp-remote",
-        "${mcpUrl}"
-      ]
+        "${mcpUrl}",
+        "--header", "X-TiDB-API-Public-Key:\${TIDB_CLOUD_PUBLIC_KEY}",
+        "--header", "X-TiDB-API-Private-Key:\${TIDB_CLOUD_PRIVATE_KEY}"
+      ],
+      "env": {
+        "TIDB_CLOUD_PUBLIC_KEY": "your-public-key",
+        "TIDB_CLOUD_PRIVATE_KEY": "your-private-key"
+      }
     }
   }
 }</pre>
@@ -567,7 +579,17 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
                     <pre id="cursor-config">{
   "mcpServers": {
     "TiDB Cloud": {
-      "url": "${mcpUrl}"
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "${mcpUrl}",
+        "--header", "X-TiDB-API-Public-Key:\${TIDB_CLOUD_PUBLIC_KEY}",
+        "--header", "X-TiDB-API-Private-Key:\${TIDB_CLOUD_PRIVATE_KEY}"
+      ],
+      "env": {
+        "TIDB_CLOUD_PUBLIC_KEY": "your-public-key",
+        "TIDB_CLOUD_PRIVATE_KEY": "your-private-key"
+      }
     }
   }
 }</pre>
@@ -583,13 +605,28 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
   "servers": {
     "TiDB Cloud": {
       "type": "http",
-      "url": "${mcpUrl}"
+      "url": "${mcpUrl}",
+      "headers": {
+        "X-TiDB-API-Public-Key": "your-public-key",
+        "X-TiDB-API-Private-Key": "your-private-key"
+      }
     }
   }
 }</pre>
                 </div>
             </div>
 
+        </div>
+
+        <div class="info-box">
+            <h3>API Key Setup</h3>
+            <p>To use the remote server, you need TiDB Cloud API keys:</p>
+            <ol style="margin-top: 0.75rem; margin-left: 1.25rem; color: var(--text-secondary); font-size: 0.9rem;">
+                <li style="margin-bottom: 0.5rem;">Log in to <a href="https://tidbcloud.com" target="_blank" style="color: var(--primary-red);">TiDB Cloud Console</a></li>
+                <li style="margin-bottom: 0.5rem;">Go to <strong>Organization Settings</strong> → <strong>API Keys</strong></li>
+                <li style="margin-bottom: 0.5rem;">Click <strong>Create API Key</strong></li>
+                <li>Copy the <strong>Public Key</strong> and <strong>Private Key</strong> into your config above</li>
+            </ol>
         </div>
 
         <div class="info-box">
@@ -600,24 +637,6 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
                 <li><strong>Option 2 (Recommended):</strong> Configure credentials in your config using <code style="background: var(--darker-bg); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem;">--header</code> flags with mcp-remote. Credentials stay local and are never stored on the server.</li>
             </ul>
             <p style="margin-top: 0.75rem;">Ask the assistant to "connect to [cluster-name]" and it will guide you through the setup.</p>
-        </div>
-
-        <div class="security-warning">
-            <h3>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                    <line x1="12" y1="9" x2="12" y2="13"/>
-                    <line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-                Security Notice
-            </h3>
-            <p>This MCP server grants powerful database management capabilities. Always review and authorize actions requested by the LLM before execution.</p>
-            <ul>
-                <li>Intended for local development and IDE integrations</li>
-                <li>Not recommended for production environments without proper OAuth setup</li>
-                <li>Ensure only authorized users have access to your MCP server URL</li>
-            </ul>
-            <p style="margin-top: 0.75rem; margin-bottom: 0;"><a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices" target="_blank">Read MCP Security Best Practices →</a></p>
         </div>
 
         <section class="examples-section">

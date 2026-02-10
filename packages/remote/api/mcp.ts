@@ -2,10 +2,11 @@
  * MCP Serverless Function for Vercel
  *
  * Authentication:
- * - Supports OAuth 2.1 per MCP specification
- * - Users authenticate via /authorize -> TiDB Cloud OAuth -> /callback -> /token
- * - Access token is passed in Authorization: Bearer <token> header
- * - Returns 401 if no valid token is provided (triggers OAuth flow in MCP clients)
+ * - Uses API Key authentication via custom headers
+ * - Users provide TiDB Cloud API keys (public + private) via:
+ *   - X-TiDB-API-Public-Key header
+ *   - X-TiDB-API-Private-Key header
+ * - Returns 401 if API keys are missing
  */
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -21,8 +22,6 @@ import {
 } from "@likidu/mcp-server-tidbcloud/tools";
 import { TiDBCloudClient } from "@likidu/mcp-server-tidbcloud/api";
 import type { Config, Environment } from "@likidu/mcp-server-tidbcloud/config";
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 
 // ============================================================
 // Vercel Configuration
@@ -43,50 +42,6 @@ const API_BASE_URLS: Record<Environment, string> = {
 };
 
 // ============================================================
-// Rate Limiting
-// ============================================================
-
-let ratelimit: Ratelimit | null = null;
-
-function getRatelimit(): Ratelimit | null {
-  if (ratelimit) return ratelimit;
-
-  if (
-    !process.env.UPSTASH_REDIS_REST_URL ||
-    !process.env.UPSTASH_REDIS_REST_TOKEN
-  ) {
-    return null;
-  }
-
-  try {
-    ratelimit = new Ratelimit({
-      redis: Redis.fromEnv(),
-      limiter: Ratelimit.slidingWindow(100, "1 m"), // 100 requests per minute
-      prefix: "ratelimit:mcp",
-    });
-    return ratelimit;
-  } catch {
-    return null;
-  }
-}
-
-function getClientIdentifier(req: VercelRequest): string {
-  // Use Bearer token if available
-  const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = Array.isArray(authHeader) ? authHeader[0] : authHeader;
-    return `token:${token.substring(7, 23)}`;
-  }
-
-  // Fall back to IP
-  const forwarded = req.headers["x-forwarded-for"];
-  const ip = Array.isArray(forwarded)
-    ? forwarded[0]
-    : forwarded?.split(",")[0]?.trim();
-  return `ip:${ip || "anonymous"}`;
-}
-
-// ============================================================
 // Helper Functions
 // ============================================================
 
@@ -94,21 +49,14 @@ function getEnvironment(): Environment {
   return process.env.TIDB_CLOUD_ENV?.toLowerCase() === "dev" ? "dev" : "prod";
 }
 
-function extractBearerToken(authHeader: string | undefined): string | null {
-  if (!authHeader) return null;
-  const match = authHeader.match(/^Bearer\s+(.+)$/i);
-  return match ? match[1] : null;
-}
-
-function createClient(accessToken: string): TiDBCloudClient {
+function createClient(publicKey: string, privateKey: string): TiDBCloudClient {
   const environment = getEnvironment();
   const config: Config = {
     environment,
-    authMode: "oauth",
-    oauth: {
-      clientId: "",
-      clientSecret: "",
-      accessToken,
+    authMode: "digest",
+    digest: {
+      publicKey,
+      privateKey,
     },
     apiBaseUrl: process.env.TIDB_CLOUD_API_URL || API_BASE_URLS[environment],
   };
@@ -137,13 +85,17 @@ function getDatabaseConfigFromHeaders(req: VercelRequest) {
   };
 }
 
-function createServer(accessToken: string, req: VercelRequest): McpServer {
+function createServer(
+  publicKey: string,
+  privateKey: string,
+  req: VercelRequest,
+): McpServer {
   const server = new McpServer({
     name: "tidbcloud-mcp-server",
-    version: "0.1.0",
+    version: "0.5.2",
   });
 
-  const client = createClient(accessToken);
+  const client = createClient(publicKey, privateKey);
   const dbConfig = getDatabaseConfigFromHeaders(req);
 
   registerRegionTools(server, client);
@@ -164,41 +116,13 @@ export default async function handler(
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, mcp-session-id, X-TiDB-DB-Host, X-TiDB-DB-User, X-TiDB-DB-Password",
+    "Content-Type, mcp-session-id, X-TiDB-API-Public-Key, X-TiDB-API-Private-Key, X-TiDB-DB-Host, X-TiDB-DB-User, X-TiDB-DB-Password",
   );
 
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     res.status(204).end();
     return;
-  }
-
-  // Rate limiting
-  const limiter = getRatelimit();
-  if (limiter) {
-    try {
-      const identifier = getClientIdentifier(req);
-      const { success, limit, remaining, reset } =
-        await limiter.limit(identifier);
-
-      res.setHeader("X-RateLimit-Limit", limit.toString());
-      res.setHeader("X-RateLimit-Remaining", remaining.toString());
-      res.setHeader("X-RateLimit-Reset", reset.toString());
-
-      if (!success) {
-        const retryAfter = Math.ceil((reset - Date.now()) / 1000);
-        res.setHeader("Retry-After", retryAfter.toString());
-        res.status(429).json({
-          error: "too_many_requests",
-          error_description: "Rate limit exceeded. Please try again later.",
-          retry_after: retryAfter,
-        });
-        return;
-      }
-    } catch (error) {
-      // Log but don't block on rate limit errors
-      console.error("[ratelimit] Error:", error);
-    }
   }
 
   // Only handle POST for MCP requests (stateless mode)
@@ -209,27 +133,25 @@ export default async function handler(
     return;
   }
 
-  // Extract Bearer token from Authorization header
-  const authHeader = req.headers.authorization;
-  const accessToken = extractBearerToken(
-    Array.isArray(authHeader) ? authHeader[0] : authHeader,
-  );
+  // Extract API keys from custom headers
+  const publicKeyHeader = req.headers["x-tidb-api-public-key"];
+  const privateKeyHeader = req.headers["x-tidb-api-private-key"];
 
-  // Return 401 if no valid token - this triggers OAuth flow in MCP clients
-  if (!accessToken) {
-    // Get the base URL for resource metadata
-    const host = req.headers.host || "mcp-server-tidbcloud-remote.vercel.app";
-    const scheme = req.headers["x-forwarded-proto"] || "https";
-    const baseUrl = `${scheme}://${host}`;
+  const publicKey = Array.isArray(publicKeyHeader)
+    ? publicKeyHeader[0]
+    : publicKeyHeader;
+  const privateKey = Array.isArray(privateKeyHeader)
+    ? privateKeyHeader[0]
+    : privateKeyHeader;
 
-    // WWW-Authenticate header with resource_metadata triggers OAuth flow in mcp-remote
-    res.setHeader(
-      "WWW-Authenticate",
-      `Bearer error="invalid_token", error_description="No authorization provided", resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
-    );
+  // Return 401 if API keys are missing
+  if (!publicKey || !privateKey) {
     res.status(401).json({
-      error: "invalid_token",
-      error_description: "No authorization provided",
+      error: "missing_api_keys",
+      error_description:
+        "TiDB Cloud API keys are required. " +
+        "Provide X-TiDB-API-Public-Key and X-TiDB-API-Private-Key headers. " +
+        "Get your API keys from TiDB Cloud console: Organization Settings > API Keys.",
     });
     return;
   }
@@ -237,10 +159,10 @@ export default async function handler(
   try {
     const environment = getEnvironment();
     console.log(
-      `[mcp] Processing request, env=${environment}, token=${accessToken.substring(0, 8)}...`,
+      `[mcp] Processing request, env=${environment}, publicKey=${publicKey.substring(0, 8)}...`,
     );
 
-    const server = createServer(accessToken, req);
+    const server = createServer(publicKey, privateKey, req);
 
     // Create transport for this request (stateless - no session management)
     const transport = new StreamableHTTPServerTransport({

@@ -12,22 +12,6 @@
       "destination": "/api/mcp"
     },
     {
-      "source": "/oauth/callback",
-      "destination": "/api/oauth-callback"
-    },
-    {
-      "source": "/api/register",
-      "destination": "/api/register"
-    },
-    {
-      "source": "/api/token",
-      "destination": "/api/token"
-    },
-    {
-      "source": "/api/device/code",
-      "destination": "/api/device"
-    },
-    {
       "source": "/skill.md",
       "destination": "/api"
     },

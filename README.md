@@ -10,14 +10,22 @@ An MCP (Model Context Protocol) server that enables LLMs to interact with TiDB C
 - **Region Discovery**: List available regions for cluster creation
 - **Async Operation Support**: Proper handling of long-running operations with status checking
 - **Two Transport Options**:
-  - **stdio**: Local server for Claude Desktop (API keys in config)
-  - **Streamable HTTP**: Remote server for hosted deployments with OAuth authentication
+  - **stdio**: Local server for Claude Desktop (API keys in env vars)
+  - **Streamable HTTP**: Remote server for hosted deployments (API keys in headers)
 
 ## Prerequisites
 
 - Node.js 22 or later
 - pnpm package manager
 - TiDB Cloud account with API access
+
+## Getting Your API Keys
+
+1. Log in to [TiDB Cloud Console](https://tidbcloud.com)
+2. Click on your organization name in the left sidebar
+3. Navigate to **Organization Settings** → **API Keys**
+4. Click **Create API Key**
+5. Copy both the **Public Key** and **Private Key** (save the private key securely - it won't be shown again)
 
 ## Installation
 
@@ -37,64 +45,7 @@ pnpm build
 
 There are two ways to use this MCP server with Claude Desktop:
 
-### Option 1: Remote Server (Recommended)
-
-Connect to the hosted MCP server using `mcp-remote`. No local setup or API keys needed - you'll authenticate with your TiDB Cloud account via OAuth.
-
-**Basic Configuration:**
-
-```json
-{
-  "mcpServers": {
-    "TiDB Cloud": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://mcp-server-tidbcloud-remote.vercel.app/mcp"]
-    }
-  }
-}
-```
-
-When you first use the server, you'll be prompted to authenticate with your TiDB Cloud account.
-
-#### Authentication Methods
-
-The remote server supports two OAuth authentication methods:
-
-1. **Authorization Code Flow (Default)**: For clients with browser support (Cursor, Claude Desktop with mcp-remote). The client redirects you to TiDB Cloud to authenticate.
-
-2. **Device Code Flow**: For headless/CLI clients that cannot handle browser redirects. The client displays a URL and code - you visit the URL in any browser to authenticate.
-
-MCP clients automatically discover supported authentication methods via the OAuth metadata endpoint.
-
-**With Database Credentials (for SQL operations):**
-
-To use database tools (`show_databases`, `db_query`, `db_execute`, etc.), configure your database credentials. The credentials are stored locally and sent via custom headers:
-
-```json
-{
-  "mcpServers": {
-    "TiDB Cloud": {
-      "command": "npx",
-      "args": [
-        "-y", "mcp-remote",
-        "https://mcp-server-tidbcloud-remote.vercel.app/mcp",
-        "--header", "X-TiDB-DB-Host:${TIDB_CLOUD_DB_HOST}",
-        "--header", "X-TiDB-DB-User:${TIDB_CLOUD_DB_USER}",
-        "--header", "X-TiDB-DB-Password:${TIDB_CLOUD_DB_PASSWORD}"
-      ],
-      "env": {
-        "TIDB_CLOUD_DB_HOST": "gateway01.us-east-1.prod.aws.tidbcloud.com",
-        "TIDB_CLOUD_DB_USER": "your-username",
-        "TIDB_CLOUD_DB_PASSWORD": "your-password"
-      }
-    }
-  }
-}
-```
-
-To get your cluster's host, use the `tidbcloud_get_cluster` tool - it will display the connection endpoint. Your username format is typically `{userPrefix}.root` where `userPrefix` is shown in the cluster details.
-
-### Option 2: Local Server (stdio)
+### Option 1: Local Server (stdio) — Recommended
 
 Run the server locally with API keys configured in Claude Desktop. Best for development or when you need full control.
 
@@ -126,13 +77,63 @@ Add the following to your Claude Desktop configuration file (`claude_desktop_con
 | `TIDB_CLOUD_DB_USER` | No | Default database username |
 | `TIDB_CLOUD_DB_PASSWORD` | No | Default database password |
 
-### Getting Your API Keys
+### Option 2: Remote Server
 
-1. Log in to [TiDB Cloud Console](https://tidbcloud.com)
-2. Click on your organization name in the left sidebar
-3. Navigate to **Organization Settings** → **API Keys**
-4. Click **Create API Key**
-5. Copy both the **Public Key** and **Private Key** (save the private key securely - it won't be shown again)
+Connect to the hosted MCP server using `mcp-remote`. Your API keys are passed via headers — they are not stored on the server.
+
+**Claude Desktop Configuration:**
+
+```json
+{
+  "mcpServers": {
+    "TiDB Cloud": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "https://mcp-server-tidbcloud-remote.vercel.app/mcp",
+        "--header", "X-TiDB-API-Public-Key:${TIDB_CLOUD_PUBLIC_KEY}",
+        "--header", "X-TiDB-API-Private-Key:${TIDB_CLOUD_PRIVATE_KEY}"
+      ],
+      "env": {
+        "TIDB_CLOUD_PUBLIC_KEY": "your-public-key",
+        "TIDB_CLOUD_PRIVATE_KEY": "your-private-key"
+      }
+    }
+  }
+}
+```
+
+**With Database Credentials (for SQL operations):**
+
+To use database tools (`show_databases`, `db_query`, `db_execute`, etc.), configure your database credentials. The credentials are stored locally and sent via custom headers:
+
+```json
+{
+  "mcpServers": {
+    "TiDB Cloud": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "https://mcp-server-tidbcloud-remote.vercel.app/mcp",
+        "--header", "X-TiDB-API-Public-Key:${TIDB_CLOUD_PUBLIC_KEY}",
+        "--header", "X-TiDB-API-Private-Key:${TIDB_CLOUD_PRIVATE_KEY}",
+        "--header", "X-TiDB-DB-Host:${TIDB_CLOUD_DB_HOST}",
+        "--header", "X-TiDB-DB-User:${TIDB_CLOUD_DB_USER}",
+        "--header", "X-TiDB-DB-Password:${TIDB_CLOUD_DB_PASSWORD}"
+      ],
+      "env": {
+        "TIDB_CLOUD_PUBLIC_KEY": "your-public-key",
+        "TIDB_CLOUD_PRIVATE_KEY": "your-private-key",
+        "TIDB_CLOUD_DB_HOST": "gateway01.us-east-1.prod.aws.tidbcloud.com",
+        "TIDB_CLOUD_DB_USER": "your-username",
+        "TIDB_CLOUD_DB_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
+To get your cluster's host, use the `tidbcloud_get_cluster` tool - it will display the connection endpoint. Your username format is typically `{userPrefix}.root` where `userPrefix` is shown in the cluster details.
 
 ## Available Tools
 
@@ -313,9 +314,26 @@ pnpm build
 # Clean build artifacts
 pnpm clean
 
-# Test with MCP Inspector
+# Test with MCP Inspector (stdio server)
 TIDB_CLOUD_PUBLIC_KEY='your-key' TIDB_CLOUD_PRIVATE_KEY='your-key' \
   npx @modelcontextprotocol/inspector node packages/server/dist/index.js
+```
+
+### Test Remote Server with MCP Inspector
+
+To test the remote HTTP server locally with API key authentication:
+
+1. Start the remote server:
+```bash
+pnpm dev:remote
+```
+
+2. In a separate terminal, connect the MCP inspector via `mcp-remote` with API key headers:
+```bash
+npx @modelcontextprotocol/inspector \
+  npx mcp-remote http://localhost:3000/mcp \
+  --header "X-TiDB-API-Public-Key:YOUR_PUBLIC_KEY" \
+  --header "X-TiDB-API-Private-Key:YOUR_PRIVATE_KEY"
 ```
 
 ## Project Structure
@@ -344,18 +362,14 @@ mcp-server-tidbcloud/
 │   │   └── tsconfig.json
 │   │
 │   └── remote/                    # Remote MCP Server (HTTP transport)
-│       ├── api/                   # Vercel serverless functions
-│       │   ├── mcp.ts             # MCP endpoint with Bearer auth
-│       │   ├── oauth-callback.ts  # OAuth callback handler
-│       │   ├── register.ts        # Dynamic client registration
-│       │   └── token.ts           # Token endpoint
+│       ├── api/
+│       │   └── mcp.ts             # MCP endpoint with API key auth
 │       ├── src/
-│       │   ├── app.ts             # Hono web app with OAuth routes
-│       │   ├── config.ts          # Configuration with OAuth support
+│       │   ├── app.ts             # Hono web app
+│       │   ├── config.ts          # Configuration
 │       │   ├── landing.ts         # Landing page
-│       │   ├── oauth-state.ts     # OAuth state management
-│       │   ├── middleware/        # Security middleware
-│       │   └── store/             # Redis storage for OAuth
+│       │   ├── skill.ts           # Skill documentation
+│       │   └── middleware/        # Security middleware
 │       ├── package.json
 │       └── vercel.json            # Vercel routing configuration
 │
@@ -385,9 +399,8 @@ This MCP server grants powerful database management capabilities. Please review 
 
 - **Always review actions**: Review and authorize actions requested by the LLM before execution
 - **Development use**: This server is intended for local development and IDE integrations
-- **Production environments**: The remote server uses OAuth 2.1 with PKCE for secure authentication
-- **Access control**: Ensure only authorized users have access to your MCP server URL
 - **API key security**: Never expose your API keys in client-side code or public repositories
+- **Access control**: Ensure only authorized users have access to your MCP server URL
 - **Audit access**: Monitor usage and regularly audit who has access to your API keys
 
 ### Environment Variable Security

@@ -5,8 +5,8 @@
  * The standard hono/vercel adapter expects Web Fetch API Request objects,
  * but Vercel's Node.js runtime passes Node.js IncomingMessage objects.
  *
- * OAuth endpoints are under /api/* which maps directly to Hono routes.
- * Other routes (/, /health, /.well-known/*) are handled via catch-all rewrite.
+ * Routes (/, /health, /skill.md) are handled via catch-all rewrite.
+ * The /mcp endpoint is handled by api/mcp.ts directly.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";

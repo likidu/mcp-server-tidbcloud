@@ -1,6 +1,6 @@
 {
   "name": "@likidu/mcp-server-tidbcloud",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "MCP server for TiDB Cloud API integration",
   "type": "module",
   "main": "dist/index.js",
