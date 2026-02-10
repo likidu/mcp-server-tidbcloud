@@ -244,6 +244,12 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
             display: flex;
             border-bottom: 1px solid var(--border-color);
             overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .tabs-header::-webkit-scrollbar {
+            display: none;
         }
 
         .tab-btn {
@@ -613,16 +619,6 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
         </div>
 
         <div class="info-box">
-            <h3>Database Operations</h3>
-            <p>To run SQL queries and manage database users, you need to provide database credentials. You have two options:</p>
-            <ul style="margin-top: 0.75rem; margin-left: 1.25rem; color: var(--text-secondary); font-size: 0.9rem;">
-                <li style="margin-bottom: 0.5rem;"><strong>Option 1:</strong> Provide credentials (host, username, password) directly in the chat when prompted</li>
-                <li><strong>Option 2 (Recommended):</strong> Configure credentials in your config using <code style="background: var(--darker-bg); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem;">--header</code> flags with mcp-remote. Credentials stay local and are never stored on the server.</li>
-            </ul>
-            <p style="margin-top: 0.75rem;">Ask the assistant to "connect to [cluster-name]" and it will guide you through the setup.</p>
-        </div>
-
-        <div class="info-box">
             <h3>API Key Setup</h3>
             <p>To use the remote server, you need TiDB Cloud API keys:</p>
             <ol style="margin-top: 0.75rem; margin-left: 1.25rem; color: var(--text-secondary); font-size: 0.9rem;">
@@ -631,6 +627,16 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
                 <li style="margin-bottom: 0.5rem;">Click <strong>Create API Key</strong></li>
                 <li>Copy the <strong>Public Key</strong> and <strong>Private Key</strong> into your config above</li>
             </ol>
+        </div>
+
+        <div class="info-box">
+            <h3>Database Operations</h3>
+            <p>To run SQL queries and manage database users, you need to provide database credentials. You have two options:</p>
+            <ul style="margin-top: 0.75rem; margin-left: 1.25rem; color: var(--text-secondary); font-size: 0.9rem;">
+                <li style="margin-bottom: 0.5rem;"><strong>Option 1:</strong> Provide credentials (host, username, password) directly in the chat when prompted</li>
+                <li><strong>Option 2 (Recommended):</strong> Configure credentials in your config using <code style="background: var(--darker-bg); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem;">--header</code> flags with mcp-remote. Credentials stay local and are never stored on the server.</li>
+            </ul>
+            <p style="margin-top: 0.75rem;">Ask the assistant to "connect to [cluster-name]" and it will guide you through the setup.</p>
         </div>
 
         <section class="examples-section">
