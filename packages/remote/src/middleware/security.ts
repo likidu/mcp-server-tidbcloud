@@ -11,27 +11,30 @@ import type { Context, Next } from "hono";
  * Allows HTTP in development for local testing.
  */
 export function httpsEnforcement() {
-  return async (c: Context, next: Next) => {
-    // Skip in development
-    if (process.env.NODE_ENV !== "production") {
-      return next();
-    }
+    return async (c: Context, next: Next) => {
+        // Skip in development or when no forwarded proto (e.g. CF Workers handles TLS)
+        const env =
+            (c.env as Record<string, string | undefined>)?.NODE_ENV ??
+            process.env?.NODE_ENV;
+        if (env !== "production") {
+            return next();
+        }
 
-    const proto = c.req.header("x-forwarded-proto");
+        const proto = c.req.header("x-forwarded-proto");
 
-    // If not HTTPS, redirect
-    if (proto && proto !== "https") {
-      const host = c.req.header("host");
-      const path = c.req.path;
-      const query = c.req.url.includes("?")
-        ? c.req.url.substring(c.req.url.indexOf("?"))
-        : "";
+        // If not HTTPS, redirect
+        if (proto && proto !== "https") {
+            const host = c.req.header("host");
+            const path = c.req.path;
+            const query = c.req.url.includes("?")
+                ? c.req.url.substring(c.req.url.indexOf("?"))
+                : "";
 
-      return c.redirect(`https://${host}${path}${query}`, 301);
-    }
+            return c.redirect(`https://${host}${path}${query}`, 301);
+        }
 
-    return next();
-  };
+        return next();
+    };
 }
 
 /**
@@ -40,30 +43,30 @@ export function httpsEnforcement() {
  * Adds common security headers to responses
  */
 export function securityHeaders() {
-  return async (c: Context, next: Next) => {
-    await next();
+    return async (c: Context, next: Next) => {
+        await next();
 
-    // Prevent MIME type sniffing
-    c.header("X-Content-Type-Options", "nosniff");
+        // Prevent MIME type sniffing
+        c.header("X-Content-Type-Options", "nosniff");
 
-    // Prevent clickjacking
-    c.header("X-Frame-Options", "DENY");
+        // Prevent clickjacking
+        c.header("X-Frame-Options", "DENY");
 
-    // XSS protection (legacy, but still useful)
-    c.header("X-XSS-Protection", "1; mode=block");
+        // XSS protection (legacy, but still useful)
+        c.header("X-XSS-Protection", "1; mode=block");
 
-    // Referrer policy
-    c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+        // Referrer policy
+        c.header("Referrer-Policy", "strict-origin-when-cross-origin");
 
-    // Content Security Policy for landing page
-    const contentType = c.res.headers?.get?.("content-type") ?? "";
-    if (c.req.path === "/" && contentType.includes("text/html")) {
-      c.header(
-        "Content-Security-Policy",
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'",
-      );
-    }
-  };
+        // Content Security Policy for landing page
+        const contentType = c.res.headers?.get?.("content-type") ?? "";
+        if (c.req.path === "/" && contentType.includes("text/html")) {
+            c.header(
+                "Content-Security-Policy",
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'",
+            );
+        }
+    };
 }
 
 /**
@@ -72,14 +75,14 @@ export function securityHeaders() {
  * Adds a unique request ID to each request for tracing
  */
 export function requestId() {
-  return async (c: Context, next: Next) => {
-    const id =
-      c.req.header("x-request-id") ||
-      `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    return async (c: Context, next: Next) => {
+        const id =
+            c.req.header("x-request-id") ||
+            `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    c.set("requestId", id);
-    c.header("X-Request-ID", id);
+        c.set("requestId", id);
+        c.header("X-Request-ID", id);
 
-    return next();
-  };
+        return next();
+    };
 }

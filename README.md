@@ -90,7 +90,7 @@ Connect to the hosted MCP server using `mcp-remote`. Your API keys are passed vi
       "command": "npx",
       "args": [
         "-y", "mcp-remote",
-        "https://mcp-server-tidbcloud-remote.vercel.app/mcp",
+        "https://mcp-server-tidbcloud.workers.dev/mcp",
         "--header", "X-TiDB-API-Public-Key:${TIDB_CLOUD_PUBLIC_KEY}",
         "--header", "X-TiDB-API-Private-Key:${TIDB_CLOUD_PRIVATE_KEY}"
       ],
@@ -114,7 +114,7 @@ To use database tools (`show_databases`, `db_query`, `db_execute`, etc.), config
       "command": "npx",
       "args": [
         "-y", "mcp-remote",
-        "https://mcp-server-tidbcloud-remote.vercel.app/mcp",
+        "https://mcp-server-tidbcloud.workers.dev/mcp",
         "--header", "X-TiDB-API-Public-Key:${TIDB_CLOUD_PUBLIC_KEY}",
         "--header", "X-TiDB-API-Private-Key:${TIDB_CLOUD_PRIVATE_KEY}",
         "--header", "X-TiDB-DB-Host:${TIDB_CLOUD_DB_HOST}",
@@ -362,16 +362,16 @@ mcp-server-tidbcloud/
 │   │   └── tsconfig.json
 │   │
 │   └── remote/                    # Remote MCP Server (HTTP transport)
-│       ├── api/
-│       │   └── mcp.ts             # MCP endpoint with API key auth
 │       ├── src/
 │       │   ├── app.ts             # Hono web app
 │       │   ├── config.ts          # Configuration
+│       │   ├── dev.ts             # Local dev server
 │       │   ├── landing.ts         # Landing page
 │       │   ├── skill.ts           # Skill documentation
+│       │   ├── worker.ts          # Cloudflare Workers entry point
 │       │   └── middleware/        # Security middleware
 │       ├── package.json
-│       └── vercel.json            # Vercel routing configuration
+│       └── wrangler.toml          # Cloudflare Workers configuration
 │
 ├── package.json                   # Root workspace config
 ├── pnpm-workspace.yaml
