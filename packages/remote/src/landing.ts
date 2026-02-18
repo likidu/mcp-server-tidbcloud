@@ -3,9 +3,9 @@
  */
 
 export function getLandingPageHtml(baseUrl: string, version: string): string {
-  const mcpUrl = `${baseUrl}/mcp`;
+    const mcpUrl = `${baseUrl}/mcp`;
 
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -558,13 +558,9 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
       "args": [
         "-y", "mcp-remote",
         "${mcpUrl}",
-        "--header", "X-TiDB-API-Public-Key:\${TIDB_CLOUD_PUBLIC_KEY}",
-        "--header", "X-TiDB-API-Private-Key:\${TIDB_CLOUD_PRIVATE_KEY}"
-      ],
-      "env": {
-        "TIDB_CLOUD_PUBLIC_KEY": "your-public-key",
-        "TIDB_CLOUD_PRIVATE_KEY": "your-private-key"
-      }
+        "--header", "X-TiDB-API-Public-Key:your-public-key",
+        "--header", "X-TiDB-API-Private-Key:your-private-key"
+      ]
     }
   }
 }</pre>
@@ -583,13 +579,9 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
       "args": [
         "-y", "mcp-remote",
         "${mcpUrl}",
-        "--header", "X-TiDB-API-Public-Key:\${TIDB_CLOUD_PUBLIC_KEY}",
-        "--header", "X-TiDB-API-Private-Key:\${TIDB_CLOUD_PRIVATE_KEY}"
-      ],
-      "env": {
-        "TIDB_CLOUD_PUBLIC_KEY": "your-public-key",
-        "TIDB_CLOUD_PRIVATE_KEY": "your-private-key"
-      }
+        "--header", "X-TiDB-API-Public-Key:your-public-key",
+        "--header", "X-TiDB-API-Private-Key:your-private-key"
+      ]
     }
   }
 }</pre>
@@ -616,6 +608,11 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
                 </div>
             </div>
 
+        </div>
+
+        <div class="security-warning">
+            <h3>Prerequisites</h3>
+            <p>The configurations above use <code style="background: var(--darker-bg); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem;">npx</code> to run <code style="background: var(--darker-bg); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem;">mcp-remote</code>. Make sure <a href="https://nodejs.org" target="_blank">Node.js</a> is installed on your system so that <code style="background: var(--darker-bg); padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem;">npx</code> is available in your PATH.</p>
         </div>
 
         <div class="info-box">
@@ -820,10 +817,6 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
             });
         }
     </script>
-    <script>
-        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-    </script>
-    <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>`;
 }

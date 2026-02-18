@@ -3,7 +3,7 @@
  */
 
 export function getSkillContent(): string {
-  return `---
+    return `---
 name: tidbcloud
 description: Manage TiDB Cloud Serverless clusters, branches, and execute SQL queries via MCP.
 homepage: https://github.com/likidu/mcp-server-tidbcloud
@@ -16,7 +16,7 @@ Use this skill to manage TiDB Cloud Serverless clusters, branches, and execute S
 ## Server URL
 
 \`\`\`
-https://mcp-server-tidbcloud-remote.vercel.app/mcp
+https://mcp-server-tidbcloud.workers.dev/mcp
 \`\`\`
 
 ## Authentication
@@ -33,7 +33,7 @@ This server uses TiDB Cloud API Key authentication via custom headers.
 ### Example with mcp-remote
 
 \`\`\`bash
-npx mcp-remote https://mcp-server-tidbcloud-remote.vercel.app/mcp \\
+npx mcp-remote https://mcp-server-tidbcloud.workers.dev/mcp \\
   --header "X-TiDB-API-Public-Key:YOUR_PUBLIC_KEY" \\
   --header "X-TiDB-API-Private-Key:YOUR_PRIVATE_KEY"
 \`\`\`

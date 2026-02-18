@@ -1,37 +1,39 @@
 {
-  "name": "@likidu/mcp-server-tidbcloud-remote",
-  "version": "0.5.2",
-  "description": "Hosted MCP server for TiDB Cloud on Vercel",
-  "type": "module",
-  "main": "dist/app.js",
-  "scripts": {
-    "dev": "dotenv -e ../../.env -- tsx watch src/dev.ts",
-    "build": "tsc",
-    "clean": "rm -rf dist",
-    "start": "node dist/dev.js"
-  },
-  "dependencies": {
-    "@hono/node-server": "^1.13.0",
-    "@likidu/mcp-server-tidbcloud": "workspace:*",
-"@vercel/analytics": "^1.4.1",
-    "hono": "^4.6.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.0",
-    "@vercel/node": "^5.1.8",
-    "dotenv-cli": "^7.4.4",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
-  },
-  "engines": {
-    "node": ">=22"
-  },
-  "keywords": [
-    "mcp",
-    "tidb",
-    "tidbcloud",
-    "model-context-protocol",
-    "vercel"
-  ],
-  "license": "MIT"
+    "name": "@likidu/mcp-server-tidbcloud-remote",
+    "version": "0.5.2",
+    "description": "Hosted MCP server for TiDB Cloud on Cloudflare Workers",
+    "type": "module",
+    "main": "dist/app.js",
+    "scripts": {
+        "dev": "dotenv -e ../../.env -- tsx watch src/dev.ts",
+        "dev:cf": "wrangler dev",
+        "deploy:cf": "wrangler deploy",
+        "build": "tsc",
+        "clean": "rm -rf dist",
+        "start": "node dist/dev.js"
+    },
+    "dependencies": {
+        "@likidu/mcp-server-tidbcloud": "workspace:*",
+        "hono": "^4.6.0"
+    },
+    "devDependencies": {
+        "@cloudflare/workers-types": "^4.20241205.0",
+        "@hono/node-server": "^1.13.0",
+        "@types/node": "^22.10.0",
+        "dotenv-cli": "^7.4.4",
+        "tsx": "^4.19.2",
+        "typescript": "^5.7.2",
+        "wrangler": "^4.66.0"
+    },
+    "engines": {
+        "node": ">=22"
+    },
+    "keywords": [
+        "mcp",
+        "tidb",
+        "tidbcloud",
+        "model-context-protocol",
+        "cloudflare-workers"
+    ],
+    "license": "MIT"
 }
