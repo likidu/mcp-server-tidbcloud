@@ -13,10 +13,10 @@ export interface ServerConfig {
 
 /**
  * Environment for TiDB Cloud API endpoints
- * - dev: Uses dev.tidbcloud.com and serverless.dev.tidbapi.com
+ * - staging: Uses staging.tidbcloud.com and serverless.staging.tidbapi.com
  * - prod: Uses tidbcloud.com and serverless.tidbapi.com
  */
-export type Environment = "dev" | "prod";
+export type Environment = "staging" | "prod";
 
 export interface Config {
     server: ServerConfig;
@@ -29,7 +29,7 @@ export interface Config {
  */
 export const API_BASE_URLS: Record<Environment, string> = {
     prod: "https://serverless.tidbapi.com",
-    dev: "https://serverless.dev.tidbapi.com",
+    staging: "https://serverless.staging.tidbapi.com",
 };
 
 /**
@@ -53,7 +53,8 @@ export function loadConfig(env?: Record<string, string | undefined>): Config {
     const port = parseInt(getEnv("PORT", env) || "3000", 10);
 
     const envValue = getEnv("TIDB_CLOUD_ENV", env)?.toLowerCase();
-    const environment: Environment = envValue === "dev" ? "dev" : "prod";
+    const environment: Environment =
+        envValue === "staging" ? "staging" : "prod";
 
     const apiBaseUrl =
         getEnv("TIDB_CLOUD_API_URL", env) || API_BASE_URLS[environment];

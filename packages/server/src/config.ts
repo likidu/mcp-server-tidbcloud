@@ -6,10 +6,10 @@ import type { DatabaseConfig } from "./db/types.js";
 
 /**
  * Environment for TiDB Cloud API endpoints
- * - dev: Uses dev.tidbcloud.com and serverless.dev.tidbapi.com
+ * - staging: Uses staging.tidbcloud.com and serverless.staging.tidbapi.com
  * - prod: Uses tidbcloud.com and serverless.tidbapi.com
  */
-export type Environment = "dev" | "prod";
+export type Environment = "staging" | "prod";
 
 /**
  * Authentication mode for the TiDB Cloud API
@@ -40,7 +40,7 @@ export interface Config {
  */
 const API_BASE_URLS: Record<Environment, string> = {
   prod: "https://serverless.tidbapi.com",
-  dev: "https://serverless.dev.tidbapi.com",
+  staging: "https://serverless.staging.tidbapi.com",
 };
 
 /**
@@ -49,9 +49,10 @@ const API_BASE_URLS: Record<Environment, string> = {
  * @throws Error if no authentication is configured
  */
 export function loadConfig(): Config {
-  // Determine environment (dev or prod, defaults to prod)
+  // Determine environment (staging or prod, defaults to prod)
   const envValue = process.env.TIDB_CLOUD_ENV?.toLowerCase();
-  const environment: Environment = envValue === "dev" ? "dev" : "prod";
+  const environment: Environment =
+    envValue === "staging" ? "staging" : "prod";
 
   // Check for API key credentials
   const publicKey = process.env.TIDB_CLOUD_PUBLIC_KEY;

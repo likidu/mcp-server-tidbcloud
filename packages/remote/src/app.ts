@@ -151,7 +151,8 @@ app.all("/mcp", async (c) => {
         process.env?.TIDB_CLOUD_ENV ??
         "prod"
     ).toLowerCase();
-    const environment: Environment = envValue === "dev" ? "dev" : "prod";
+    const environment: Environment =
+        envValue === "staging" ? "staging" : "prod";
     const apiBaseUrl =
         c.env?.TIDB_CLOUD_API_URL ??
         process.env?.TIDB_CLOUD_API_URL ??
