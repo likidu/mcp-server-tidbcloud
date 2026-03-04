@@ -190,7 +190,7 @@ export class TiDBDatabase {
 /**
  * Dangerous SQL patterns that should be blocked even in seemingly read-only queries
  */
-const DANGEROUS_PATTERNS: RegExp[] = [
+export const DANGEROUS_PATTERNS: RegExp[] = [
   /INTO\s+OUTFILE/i,
   /INTO\s+DUMPFILE/i,
   /LOAD_FILE\s*\(/i,

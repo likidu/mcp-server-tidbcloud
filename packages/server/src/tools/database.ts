@@ -6,30 +6,15 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
     TiDBDatabase,
-    TiDBDatabaseError,
     isReadOnlyQuery,
     formatDatabaseError,
 } from "../db/client.js";
 import type { DatabaseConfig } from "../db/types.js";
-
-// ============================================================================
-// Zod Schemas for Connection Override
-// ============================================================================
-
-const ConnectionOverrideSchema = z.object({
-    host: z
-        .string()
-        .optional()
-        .describe("Database host (overrides environment variable)"),
-    username: z
-        .string()
-        .optional()
-        .describe("Database username (overrides environment variable)"),
-    password: z
-        .string()
-        .optional()
-        .describe("Database password (overrides environment variable)"),
-});
+import {
+    ConnectionOverrideSchema,
+    resolveConfig,
+    formatQueryResultsAsTable,
+} from "./utils.js";
 
 // ============================================================================
 // Tool Input Schemas
@@ -133,71 +118,6 @@ type DbCreateUserInput = z.infer<typeof DbCreateUserInputSchema>;
 type DbRemoveUserInput = z.infer<typeof DbRemoveUserInputSchema>;
 
 // ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Resolves database configuration from defaults and overrides
- */
-function resolveConfig(
-    defaultConfig: DatabaseConfig | undefined,
-    overrides: { host?: string; username?: string; password?: string },
-): DatabaseConfig {
-    const host = overrides.host ?? defaultConfig?.host;
-    const username = overrides.username ?? defaultConfig?.username;
-    const password = overrides.password ?? defaultConfig?.password;
-
-    if (!host || !username || !password) {
-        throw new TiDBDatabaseError(
-            "Database connection not configured. " +
-                "The user has two options: " +
-                "(1) Provide host, username, and password in this conversation, or " +
-                "(2) Configure credentials in Claude Desktop config using mcp-remote --header flags " +
-                "(recommended for persistent setup - credentials stay local, never stored on server). " +
-                "Use tidbcloud_get_cluster to retrieve the host and port for the cluster.",
-        );
-    }
-
-    return {
-        host,
-        username,
-        password,
-        database: defaultConfig?.database,
-    };
-}
-
-/**
- * Formats query results as a markdown table
- */
-function formatQueryResultsAsTable(
-    columns: string[],
-    rows: Record<string, unknown>[],
-): string {
-    if (rows.length === 0) {
-        return "No results returned.";
-    }
-
-    const lines: string[] = [];
-
-    // Header row
-    lines.push("| " + columns.join(" | ") + " |");
-    // Separator row
-    lines.push("| " + columns.map(() => "---").join(" | ") + " |");
-    // Data rows
-    for (const row of rows) {
-        const values = columns.map((col) => {
-            const value = row[col];
-            if (value === null) return "NULL";
-            if (value === undefined) return "";
-            return String(value);
-        });
-        lines.push("| " + values.join(" | ") + " |");
-    }
-
-    return lines.join("\n");
-}
-
-// ============================================================================
 // Tool Registration
 // ============================================================================
 
@@ -219,45 +139,7 @@ export function registerDatabaseTools(
 
 Executes SHOW DATABASES and returns the list of database names.
 
-**IMPORTANT: Database credentials required.** You MUST ask the user to choose one of these options:
-
-**Option 1: Provide credentials in this conversation**
-- Ask user for username and password
-- Pass as host, username, password parameters to this tool
-
-**Option 2: Configure in Claude Desktop (RECOMMENDED)**
-- Show user this claude_desktop_config.json example:
-  {
-    "mcpServers": {
-      "TiDB Cloud": {
-        "command": "npx",
-        "args": [
-          "-y", "mcp-remote",
-          "https://mcp-server-tidbcloud.workers.dev/mcp",
-          "--header", "X-TiDB-DB-Host:\${TIDB_CLOUD_DB_HOST}",
-          "--header", "X-TiDB-DB-User:\${TIDB_CLOUD_DB_USER}",
-          "--header", "X-TiDB-DB-Password:\${TIDB_CLOUD_DB_PASSWORD}"
-        ],
-        "env": {
-          "TIDB_CLOUD_DB_HOST": "<host from tidbcloud_get_cluster>",
-          "TIDB_CLOUD_DB_USER": "<username>",
-          "TIDB_CLOUD_DB_PASSWORD": "<password>"
-        }
-      }
-    }
-  }
-- Credentials stay local, never stored on server
-- Works for all future sessions without re-entering
-
-Use tidbcloud_get_cluster to get the host and port for the cluster.
-
-Args:
-  - host (string, optional): Database host
-  - username (string, optional): Database username
-  - password (string, optional): Database password
-
-Returns:
-  List of database names in the cluster.`,
+Connection credentials (host, username, password) are needed. The host and username prefix can be obtained from tidbcloud_get_cluster (endpoints.public.host and userPrefix). Only the password needs to be provided by the user — either inline or pre-configured via Claude Desktop config headers.`,
             inputSchema: ShowDatabasesInputSchema,
             annotations: {
                 readOnlyHint: true,
@@ -310,18 +192,7 @@ Returns:
 
 Executes SHOW TABLES and returns the list of table names.
 
-**IMPORTANT: Database credentials required.** You MUST ask the user to choose:
-1. Provide credentials in this conversation (ask for username/password)
-2. Configure in Claude Desktop config with --header flags (RECOMMENDED - show the config example)
-
-Args:
-  - database (string, required): The database to list tables from
-  - host (string, optional): Database host
-  - username (string, optional): Database username
-  - password (string, optional): Database password
-
-Returns:
-  List of table names in the database.`,
+Connection credentials (host, username, password) are needed. The host and username prefix can be obtained from tidbcloud_get_cluster (endpoints.public.host and userPrefix). Only the password needs to be provided by the user — either inline or pre-configured via Claude Desktop config headers.`,
             inputSchema: ShowTablesInputSchema,
             annotations: {
                 readOnlyHint: true,
@@ -377,19 +248,7 @@ Returns:
 Only SELECT, SHOW, DESCRIBE, and EXPLAIN statements are allowed.
 Results are returned as a formatted markdown table.
 
-**IMPORTANT: Database credentials required.** You MUST ask the user to choose:
-1. Provide credentials in this conversation (ask for username/password)
-2. Configure in Claude Desktop config with --header flags (RECOMMENDED - show the config example)
-
-Args:
-  - sql (string, required): The read-only SQL query to execute
-  - database (string, optional): Database to use for the query
-  - host (string, optional): Database host
-  - username (string, optional): Database username
-  - password (string, optional): Database password
-
-Returns:
-  Query results as a markdown table.`,
+Connection credentials (host, username, password) are needed. The host and username prefix can be obtained from tidbcloud_get_cluster (endpoints.public.host and userPrefix). Only the password needs to be provided by the user — either inline or pre-configured via Claude Desktop config headers.`,
             inputSchema: DbQueryInputSchema,
             annotations: {
                 readOnlyHint: true,
@@ -465,19 +324,7 @@ Can execute a single statement or multiple statements in sequence.
 
 **WARNING:** This tool can modify or delete data. Use with caution.
 
-**IMPORTANT: Database credentials required.** You MUST ask the user to choose:
-1. Provide credentials in this conversation (ask for username/password)
-2. Configure in Claude Desktop config with --header flags (RECOMMENDED - show the config example)
-
-Args:
-  - sql (string | string[], required): SQL statement(s) to execute
-  - database (string, optional): Database to use
-  - host (string, optional): Database host
-  - username (string, optional): Database username
-  - password (string, optional): Database password
-
-Returns:
-  Number of rows affected by each statement.`,
+Connection credentials (host, username, password) are needed. The host and username prefix can be obtained from tidbcloud_get_cluster (endpoints.public.host and userPrefix). Only the password needs to be provided by the user — either inline or pre-configured via Claude Desktop config headers.`,
             inputSchema: DbExecuteInputSchema,
             annotations: {
                 readOnlyHint: false,
@@ -548,20 +395,7 @@ Returns:
 
 Creates a user with the specified username, password, and host restriction.
 
-**IMPORTANT: Admin credentials required.** You MUST ask the user to choose:
-1. Provide credentials in this conversation (ask for admin username/password)
-2. Configure in Claude Desktop config with --header flags (RECOMMENDED - show the config example)
-
-Args:
-  - username (string, required): Username for the new user
-  - password (string, required): Password for the new user
-  - userHost (string, optional): Host restriction (default: '%' for any host)
-  - host (string, optional): Admin database host
-  - adminUsername (string, optional): Admin username
-  - adminPassword (string, optional): Admin password
-
-Returns:
-  Success message with created user information.`,
+Admin connection credentials (host, adminUsername, adminPassword) are needed. The host and username prefix can be obtained from tidbcloud_get_cluster (endpoints.public.host and userPrefix). Only the password needs to be provided by the user — either inline or pre-configured via Claude Desktop config headers.`,
             inputSchema: DbCreateUserInputSchema,
             annotations: {
                 readOnlyHint: false,
@@ -622,19 +456,7 @@ Returns:
 
 **WARNING:** This action is irreversible. The user will be permanently deleted.
 
-**IMPORTANT: Admin credentials required.** You MUST ask the user to choose:
-1. Provide credentials in this conversation (ask for admin username/password)
-2. Configure in Claude Desktop config with --header flags (RECOMMENDED - show the config example)
-
-Args:
-  - username (string, required): Username of the user to remove
-  - userHost (string, optional): Host specification (default: '%')
-  - host (string, optional): Admin database host
-  - adminUsername (string, optional): Admin username
-  - adminPassword (string, optional): Admin password
-
-Returns:
-  Success message confirming user removal.`,
+Admin connection credentials (host, adminUsername, adminPassword) are needed. The host and username prefix can be obtained from tidbcloud_get_cluster (endpoints.public.host and userPrefix). Only the password needs to be provided by the user — either inline or pre-configured via Claude Desktop config headers.`,
             inputSchema: DbRemoveUserInputSchema,
             annotations: {
                 readOnlyHint: false,
