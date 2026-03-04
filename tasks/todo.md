@@ -27,9 +27,9 @@ Then update `database.ts` to import these from `utils.ts`. No behavior change.
 
 Also export `DANGEROUS_PATTERNS` from `db/client.ts` (currently module-private) so `vector.ts` can reuse it for filter validation.
 
-- [ ] Create `packages/server/src/tools/utils.ts`
-- [ ] Refactor `packages/server/src/tools/database.ts` to import from utils
-- [ ] Export `DANGEROUS_PATTERNS` from `packages/server/src/db/client.ts`
+- [x] Create `packages/server/src/tools/utils.ts`
+- [x] Refactor `packages/server/src/tools/database.ts` to import from utils
+- [x] Export `DANGEROUS_PATTERNS` from `packages/server/src/db/client.ts`
 
 ### Step 2: Create `packages/server/src/tools/diagnostics.ts`
 
@@ -61,8 +61,8 @@ Also export `DANGEROUS_PATTERNS` from `db/client.ts` (currently module-private) 
 - **Return**: Formatted markdown table of slow queries
 - **Annotations**: `readOnlyHint: true`, `idempotentHint: true`
 
-- [ ] Implement `db_explain` tool
-- [ ] Implement `db_show_slow_queries` tool
+- [x] Implement `db_explain` tool
+- [x] Implement `db_show_slow_queries` tool
 
 ### Step 3: Create `packages/server/src/tools/vector.ts`
 
@@ -104,14 +104,14 @@ Also export `DANGEROUS_PATTERNS` from `db/client.ts` (currently module-private) 
 
 ### Step 4: Wire up registration
 
-- [ ] Update `packages/server/src/tools/index.ts` - add exports for `registerDiagnosticsTools` and `registerVectorTools`
-- [ ] Update `packages/server/src/server.ts` - register new tool groups
-- [ ] Update `packages/remote/src/app.ts` - register new tool groups (+ imports)
+- [x] Update `packages/server/src/tools/index.ts` - add exports for `registerDiagnosticsTools` ~~and `registerVectorTools`~~
+- [x] Update `packages/server/src/server.ts` - register diagnostics tools
+- [x] Update `packages/remote/src/app.ts` - register diagnostics tools
 
 ### Step 5: Update documentation
 
-- [ ] Update `SKILL.md` with 5 new tools
-- [ ] Update `packages/remote/src/skill.ts` with same content
+- [x] Update `SKILL.md` with diagnostics tools
+- [x] Update `packages/remote/src/skill.ts` with same content
 
 ## Key Files
 

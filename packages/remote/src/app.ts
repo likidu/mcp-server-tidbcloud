@@ -21,6 +21,7 @@ import {
     registerBranchTools,
     registerRegionTools,
     registerDatabaseTools,
+    registerDiagnosticsTools,
 } from "@likidu/mcp-server-tidbcloud/tools";
 import { TiDBCloudClient } from "@likidu/mcp-server-tidbcloud/api";
 import type {
@@ -47,7 +48,7 @@ type Bindings = {
     SERVER_HOST?: string;
 };
 
-const VERSION = "0.5.2";
+const VERSION = "0.5.3";
 
 // ============================================================
 // Hono App Setup
@@ -189,6 +190,7 @@ app.all("/mcp", async (c) => {
     registerClusterTools(mcpServer, client);
     registerBranchTools(mcpServer, client);
     registerDatabaseTools(mcpServer, dbConfig);
+    registerDiagnosticsTools(mcpServer, dbConfig);
 
     const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: undefined,

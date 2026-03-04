@@ -10,12 +10,13 @@ import {
     registerClusterTools,
     registerRegionTools,
     registerDatabaseTools,
+    registerDiagnosticsTools,
 } from "./tools/index.js";
 
 /**
  * Server version - should match package.json
  */
-const SERVER_VERSION = "0.5.2";
+const SERVER_VERSION = "0.5.3";
 
 /**
  * Server name following MCP naming convention
@@ -43,6 +44,7 @@ export function createServer(config: Config): McpServer {
     registerClusterTools(server, client);
     registerBranchTools(server, client);
     registerDatabaseTools(server, config.database);
+    registerDiagnosticsTools(server, config.database);
 
     return server;
 }

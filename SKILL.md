@@ -59,6 +59,10 @@ npx mcp-remote https://mcp-server-tidbcloud.workers.dev/mcp \
 - **db_create_user** - Create a database user
 - **db_remove_user** - Remove a database user
 
+### HTAP Diagnostics (requires DB credentials)
+- **db_explain** - Explain a SQL statement's execution plan with HTAP engine breakdown (TiDB/TiKV/TiFlash)
+- **db_show_slow_queries** - List slow queries from the cluster's slow query log
+
 ## Database Credentials
 
 For SQL operations, provide credentials via headers:
@@ -75,6 +79,8 @@ Use `tidbcloud_get_cluster` to find your cluster's connection endpoint.
 - "Show me the connection details for cluster 'my-cluster'"
 - "Create a branch called 'feature-test' from cluster 'main-db'"
 - "Run SELECT * FROM users LIMIT 10 on database 'myapp'"
+- "Explain this query and show which engines are used"
+- "Show me the slowest queries in the last hour"
 - "What regions are available for TiDB Cloud?"
 
 ## Notes

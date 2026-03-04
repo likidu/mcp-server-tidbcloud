@@ -447,6 +447,56 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
             font-size: 0.875rem;
         }
 
+        /* Changelog Section */
+        .changelog-section {
+            margin-bottom: 3rem;
+        }
+
+        .changelog-section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .changelog-entry {
+            margin-bottom: 1.5rem;
+            padding: 1rem 1.25rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        .changelog-entry h3 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .changelog-entry h3 .changelog-version {
+            color: var(--primary-red);
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+        }
+
+        .changelog-entry h3 .changelog-date {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 400;
+        }
+
+        .changelog-entry ul {
+            margin: 0;
+            padding-left: 1.25rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .changelog-entry li {
+            margin-bottom: 0.35rem;
+        }
+
         /* Footer */
         footer {
             text-align: center;
@@ -663,6 +713,14 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
                     <div class="example-category">Database</div>
                     <p>Run a query to find the top 10 customers by order count</p>
                 </div>
+                <div class="example-card" onclick="copyExample(this)">
+                    <div class="example-category">Diagnostics</div>
+                    <p>Explain this query and show which engines are used</p>
+                </div>
+                <div class="example-card" onclick="copyExample(this)">
+                    <div class="example-category">Diagnostics</div>
+                    <p>Show me the slowest queries in the last hour</p>
+                </div>
             </div>
         </section>
 
@@ -748,6 +806,20 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
             </div>
 
             <div class="tool-category">
+                <h3>HTAP Diagnostics</h3>
+                <div class="tool-list">
+                    <div class="tool-item">
+                        <span class="tool-name">db_explain</span>
+                        <span class="tool-desc">Explain execution plan with HTAP engine breakdown (TiDB/TiKV/TiFlash)</span>
+                    </div>
+                    <div class="tool-item">
+                        <span class="tool-name">db_show_slow_queries</span>
+                        <span class="tool-desc">List slow queries with execution stats</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tool-category">
                 <h3>Regions</h3>
                 <div class="tool-list">
                     <div class="tool-item">
@@ -755,6 +827,34 @@ export function getLandingPageHtml(baseUrl: string, version: string): string {
                         <span class="tool-desc">List available cloud regions for cluster creation</span>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <section class="changelog-section">
+            <h2>Change Log</h2>
+
+            <div class="changelog-entry">
+                <h3>
+                    <span class="changelog-version">v0.5.3</span>
+                    <span class="changelog-date">2026-03-04</span>
+                </h3>
+                <ul>
+                    <li>Added HTAP diagnostics tools: <strong>db_explain</strong> (execution plan with TiDB/TiKV/TiFlash engine breakdown) and <strong>db_show_slow_queries</strong> (slow query log analysis)</li>
+                    <li>Simplified database credential flow &mdash; host and username are now auto-resolved from cluster info, only password needs user input</li>
+                    <li>Extracted shared database utilities into a dedicated module</li>
+                </ul>
+            </div>
+
+            <div class="changelog-entry">
+                <h3>
+                    <span class="changelog-version">v0.5.2</span>
+                    <span class="changelog-date">2026-02-28</span>
+                </h3>
+                <ul>
+                    <li>Added staging environment support</li>
+                    <li>Migrated from Vercel to Cloudflare Workers</li>
+                    <li>Switched to API key authentication</li>
+                </ul>
             </div>
         </section>
 
